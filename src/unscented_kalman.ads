@@ -11,6 +11,9 @@ package Unscented_Kalman is
   type State_Vector is new Data_Arrays.Real_Vector (State_Vector_Range);
   type Measurement_Vector is new Data_Arrays.Real_Vector (Measurement_Vector_Range);
 
+  type Estimate_Weights_Vector is new Data_Arrays.Real_Matrix (Sigma_Points_Vector_Range, 1);
+  type Covariance_Weights_Vector is new Data_Arrays.Real_Matrix (Sigma_Points_Vector_Range, 1);
+
   type Sigma_Points_Matrix is new Data_Arrays.Real_Matrix (Sigma_Points_Vector_Range, State_Vector_Range);
   
   type State_Matrix is new Data_Arrays.Real_Matrix (Sigma_Points_Vector_Range, State_Vector_Range);
@@ -21,9 +24,6 @@ package Unscented_Kalman is
   type Measurement_Covariance_Matrix is new Data_Arrays.Real_Matrix (Measurement_Vector_Range, Measurement_Vector_Range);
   
   type Cross_Covariance_Matrix is new Data_Arrays.Real_Matrix (State_Vector_Range, Measurement_Vector_Range);
-  
-  type Estimate_Weight is new T;
-  type Covariance_Weight is new T;
   
   type Transition_Function is access function (
     Sigma_Points: Sigma_Points_Matrix
@@ -37,18 +37,18 @@ package Unscented_Kalman is
     State : State_Vector;
     Covariance : Covariance_Vector;
   end record;
+
+  function Initial_Estimate_Weights (Alpha, Kappa : T) return Estimate_Weights_Vector;
+  function Estimate_Weights (Alpha, Kappa : T) return Estimate_Weights_Vector;
+
+  function Initial_Covariance_Weights (Alpha, Beta, Kappa : T) return Covariance_Weights_Vector;
+  function Covariance_Weights (Alpha, Kappa : T) return Covariance_Weights_Vector;
   
   procedure Update_Sigma_Points (
     Previous_Sigma_Points : in out Sigma_Points_Matrix; 
     Previous_State_Estimate : State_Vector; 
     Previous_State_Covariance : Covariance_Matrix);
 
-  function Initial_Estimate_Weights (Sigma_Points : Sigma_Points_Vector) return Estimate_Weight;
-  function Estimate_Weights (Sigma_Points : Sigma_Points_Vector) return Estimate_Weight;
-
-  function Initial_Covariance_Weights (Sigma_Points : Sigma_Points_Vector) return Covariance_Weight;
-  function Covariance_Weights (Sigma_Points : Sigma_Points_Vector) return Covariance_Weight;
-  
   function Propagate_State (
     Sigma_Points : Sigma_Points_Matrix;
     Transition : Transition_Function
@@ -90,10 +90,11 @@ package Unscented_Kalman is
     Propagated_Measurements : Measurement_Matrix
   ) return Cross_Covariance_Matrix;
   
-  function Kalman_Gain (
+  procedure Update_Kalman_Gain (
+    Current_Kalman_Gain : Measurement_Covariance_Matrix;
     Cross_Covariance : Cross_Covariance_Matrix;
     Measurement_Covariance : Measurement_Covariance_Matrix
-  ) return Measurement_Covariance_Matrix;
+  );
   
   procedure Update_State_Estimate (
     Current_State : in out State_Vector;
