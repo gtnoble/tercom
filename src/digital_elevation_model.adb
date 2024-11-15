@@ -9,11 +9,19 @@ package body Digital_Elevation_Model is
       Reference_Location : constant Reference_Coordinates := 
         DEM_Map.Reference_Location;
       Map_Column_Index : DEM_Row_Column_Index := 
-        DEM_Row_Column_Index ((Coordinates.Longitude - 
-        Longitude (Reference_Location.Longitude)) * DEM_Dimensions);
+        DEM_Row_Column_Index (
+          (
+            Coordinates.Longitude - 
+            Longitude (Reference_Location.Longitude)
+          ) * DEM_Dimensions
+        );
       Map_Row_Index : DEM_Row_Column_Index := 
-        DEM_Row_Column_Index ((Coordinates.Latitude - 
-        Latitude (Reference_Location.Latitude)) * DEM_Dimensions);
+        DEM_Row_Column_Index (
+          (
+            Coordinates.Latitude - 
+            Latitude (Reference_Location.Latitude)
+          ) * DEM_Dimensions
+        );
       
       Data_Row_Index : DEM_Data_Index := DEM_Dimensions * Map_Row_Index;
       Data_Column_Index : DEM_Data_Index := Data_Row_Index + Map_Row_Index;

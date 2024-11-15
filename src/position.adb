@@ -38,25 +38,33 @@ package body Position is
     return Angle / Pi * 180;
   end To_Degrees;
   
-  function Shifted_Location (Current_Location : Geographic_Coordinates; Motion : Ground_Movement)
+  function Shifted_Location (Current_Location : Geographic_Location; Displacement : Motion)
   is
     Tangent_Sphere_Radius : Earth_Radius;
-    Delta_Latitude : Precise_Float;
-    Delta_Longitude : Precise_Float; 
-    Shifted_Coordinates : Geographic_Coordinates;
+    Delta_Latitude        : Precise_Float;
+    Delta_Longitude       : Precise_Float; 
+    Delta_Altitude        : Precise_Float;
+    Shifted_Coordinates   : Geographic_Coordinates;
   begin
     Tangent_Sphere_Radius := Earth_Mean_Radius_Of_Curvature(Current_Location.Latitude);
-    Delta_Latitude := To_Degrees (Motion.Northward_Distance / Tangent_Sphere_Radius);
+
+    Delta_Latitude  := To_Degrees (Displacement (1) / Tangent_Sphere_Radius);
     Delta_Longitude := To_Degrees (
-      Motion.Eastward_Distance / 
+      Displacement (0) / 
       (
         Tangent_Sphere_Radius * 
         Precise_Math.Cos(To_Radians(Current_Location.Latitude))
       )
     );
-    Shifted_Coordinates.Latitude := Current_Location.Latitude + Delta_Latitude;
-    Shifted_Coordinates.Longitude := Wrap_Longitude (Current_Location.Longitude + Delta_Longitude);
-    return Shifted_Coordinates;
+    Delta_Altitude := Displacement (2);
+
+    Shifted_Coordinates.Latitude  := Current_Location.Latitude + Delta_Latitude;
+    Shifted_Coordinates.Longitude := Wrap_Longitude (
+                                      Current_Location.Longitude + 
+                                      Delta_Longitude);
+    Shifted_Altitude              := Current_Location.Altitude + Delta_Altitude;
+
+    return (Altitude => Shifted_Altitude, Coordinates => Shifted_Coordinates);
   end Shifted_Location;
   
   function Wrap_Longitude (Angle : Degrees) return Longitude 

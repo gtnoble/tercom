@@ -1,5 +1,5 @@
-
 with Math; use Math;
+with Kinematics;
 
 package Position is
   type Latitude is new Degrees range -90 .. 90;
@@ -7,21 +7,14 @@ package Position is
   type Longitude is new Degrees_Wrapped;
   type Longitude_Change is new Longitude;
   
-  package Cartesian_Location is new Vector (Precise_Float);
+  package Kinematics is new Generic_Kinematics (Precise_Float);
 
   -- Elevation Extremes on Earth's Surface in meters
   type Altitude is new Precise_Float range -1000 .. 10000;
   type Altitude_Change is new Precise_Float range -11000 .. 11000;
 
-  -- Max is beyond long jump world record in meters
-  type Step_Distance is digits 6 range 0 .. 10;
-  type Step_Distance_Change is digits 6 range -10 .. 10;
-  
-  -- Northward, Eastward in meters
-  type Ground_Movement is new Cartesian_Location.Vector_2D;
-
   type Geographic_Coordinates is record
-    Latitude : Latitude;
+    Latitude  : Latitude;
     Longitude : Longitude;
   end record;
   
@@ -42,7 +35,7 @@ package Position is
   Earth_Elipsoid_Eccentricity_Squared : constant Precise_Float := Earth_Elipsoid_Flattening * (2 - Earth_Elipsoid_Flattening);
   
   
-  function Shifted_Location (CurrentLocation : Geographic_Coordinates; Motion : Ground_Movement) return Geographic_Coordinates;
+  function Shifted_Location (Current_Location : Geographic_Location; Displacement : Kinematics.Displacement) return Geographic_Coordinates;
   function Earth_Mean_Radius_Of_Curvature (Phi : Latitude) return Earth_Radius;
   
 private
