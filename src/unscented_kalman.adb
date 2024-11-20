@@ -1,81 +1,125 @@
 package body Unscented_Kalman is
-  function Inital_Estimate_Weights (Alpha, Kappa : T) return Estimate_Weights_Vector
-  is
-    Weights : Estimate_Weights_Vector := (others => 1);
-  begin
-    Weights := Weights *
-      (Alpha ** 2 * Kappa - (Weights'Length / 2)) /
-      Alpha ** 2 * Kappa;
-    return Weights;
-  end Initial_Estimate_Weights;
   
-  function Estimate_Weights (Alpha, Kappa : T)
+  function Predict (
+    Previous_Update : Filter_Estimate;
+    Sigma_Points : Sigma_Points_Type;
+    Transition_Function : Transition_Function_Type;
+    Transition_Noise_Covariance : State_Covariance;
+    Weights : Weights_Type
+  ) return Filter_Estimate
   is
-    Weights : Estimate_Weights_Vector := (others => 1);
+    Predicted_Estimate : Filter_Estimate;
+    Propagated_Sigma_Points : Sigma_Points_Type;
   begin
-    Weights := Weights * (1 / (2 * Alpha ** 2 * Kappa));
-    return Weights;
-  end Estimate_Weights;
-  
-  function Initial_Covariance_Weights (Alpha, Beta : T) return Covariance_Weights_Vector
-  is
-    Weights : Covariance_Weights_Vector := (others => 1.0);
-  begin
-    Weights := Initial_Estimate_Weights + (1 - Alpha ** 2 + Beta) * Weights;
-    return Weights;
-  end Initial_Covariance_Weights;
-  
-  function Covariance_Weights (Alpha, Kappa : T) return Covariance_Weights_Vector
-  is
-  begin
-    return Covariance_Weights_Vector (Estimate_Weights (Alpha => Alpha, Kappa => Kappa));
-  end Covariance_Weights;
-  
-  function Predict_State (
-    Propagated_State : State_Matrix; 
-    Weights : Estimate_Weights_Vectori
-  ) return State_Vector
-  is
-  begin
-    return Sum_Columns (Propagated_State * Weights);
-  end Predict_State;
-  
-  function Predict_State_Covariance (
-    Propagated_State : State_Matrix;
-    Predict_State : State_Vector;
-    Weights : Covariance_Weights_Vector;
-    Transition_Noise_Covariance : State_Covariance_Matrix
-  ) return State_Covariance_Matrix
-  is
-    Predicted_State_Covariance : State_Covariance_Matrix := (others => (others => 0.0));
-  begin
-    for Sigma_Point in Propagated_State loop
-      Predicted_State_Covariance := Predicted_State_Covariance + 
-        Sigma_Point * Data_Arrays.Transpose (Sigma_Point) * Weights + Transition_Noise_Covariance;
+    for Index in Sigma_Points'Range loop
+      Propagated_Sigma_Points (Index) := Transition_Function (Sigma_Points (Index));
     end loop;
-    return Predicted_State_Covariance;
-  end Predict_State_Covariance;
+    
+    return Predict_State_Statistics (Propagated_Sigma_Points, Weights, Transition_Noise_Covariance);
+  end Predict;
   
-  function Update_State_Estimate (
-    Predicted_State : State_Vector;
-    Kalman_Gain : Measurement_Covariance_Matrix;
-    Predicted_Measurement : Measurement_Vector;
-    Actual_Measurement : Measurement_Vector
-  ) return State_Vector
+  function Update (
+    Previous_Prediction : Filter_Estimate;
+    Actual_Measurement : Measurement;
+    Sigma_Points : in out Sigma_Points_Type;
+    Measurement_Function : Measurement_Function_Type;
+    Measurement_Noise_Covariance : Measurement_Covariance_Matrix;
+    Weights : Weights_Type
+  ) return Filter_Estimate
   is
+    type Measurement_Prediction_Type is record
+      Mean : Measurement;
+      Covariance : Measurement_Covariance_Matrix;
+    end record;
+    
+    Propagated_Measurement_Points : Measurement_Matrix_Type;
+    Measurement_Prediction : Measurement_Prediction_Type;
+    Kalman_Gain : Measurement_Covariance_Matrix;
+    
   begin
-    return Predicted_State + Kalman_Gain * (Actual_Measurement - Predicted_Measurement);
-  end Update_State_Estimate;
+    Update_Sigma_Points(Sigma_Points, Previous_Prediction);
+
+    for Index of Sigma_Points'Range loop
+      Propagated_Measurement_Points (Index) := Measurement_Function (Sigma_Points (Index));
+    end loop;
+
+    Measurement_Prediction := Predict_Measurement_Statistics(
+      Propagated_Measurement_Points, 
+      Weights, 
+      Measurement_Noise_Covariance
+    );
+    
+    declare
+      State_Measurement_Cross_Covariance : Cross_Covariance_Matrix := (others => (others => 0));
+    begin
+      for Index of Sigma_Points'Range loop
+        State_Measurement_Cross_Covariance := State_Measurement_Cross_Covariance +
+                                              Weights.Covariance (Index) *
+                                              (Sigma_Points (Index) - Previous_Prediction.Mean) *
+                                              Transpose (
+                                                Propagated_Measurement_Points (Index) - Measurement_Prediction.Mean
+                                              ) +
+                                              Measurement_Noise_Covariance;
+      end loop;
+      Kalman_Gain := State_Measurement_Cross_Covariance * Inverse (Measurement_Prediction.Covariance);
+    end;
+    
+    return (Mean => Previous_Prediction.Mean + 
+                    Kalman_Gain * (Actual_Measurement - Measurement_Prediction.Mean),
+            Covariance => Previous_Prediction.Covariance - 
+                          Kalman_Gain * 
+                          Measurement_Prediction.Covariance * 
+                          Transpose (Kalman_Gain));
+  end Update;
+
   
-  function Update_State_Covariance (
-    Predicted_Covariance : State_Covariance_Matrix;
-    Kalman_Gain : Measurement_Covariance_Matrix;
-    Measurement_Covariance_Matrix : Measurement_Covariance_Matrix
-  ) return State_Covariance_Matrix
+  function Get_Weights (Alpha, Beta, Kappa : T) return Weights_Type
   is
+    Resulting_Weights : Weights_Type;
   begin
-    return Predicted_Covariance - 
-      Kalman_Gain * Measurement_Covariance_Matrix * Data_Arrays.Transpose (Kalman_Gain);
-  end Update_State_Covariance;
+    declare
+      Mean_Weights : Weights_Type := (others => (1 / (2 * Alpha ** 2 * Kappa)));
+      Covariance_Weights : Weights_Type := Mean_Weights;
+      Center_Element_Index : Sigma_Points_Vector_Range := (Resulting_Weights'First + Resulting_Weights'Last) / 2;
+    begin
+      Mean_Weights (Mean_Weights'First) := (Alpha ** 2 * Kappa - Resulting_Weights'Length / 2) / 
+                                           (Alpha ** 2 * Kappa);
+      Covariance_Weights (Covariance_Weights'First) := Mean_Weights (Mean_Weights'First) + 
+                                                       1 - 
+                                                       Alpha ** 2 + 
+                                                       Beta;
+      Resulting_Weights.Covariance := Covariance_Weights;
+      Resulting_Weights.Mean := Mean_Weights;
+    end;
+    return Resulting_Weights;
+  end Weights;
+  
+  function Predict_Statistics_Generic (
+    Propagated_Points  : Propagated_Points_Type;
+    Weights            : Weights_Type;
+    Noise_Covariance   : Covariance_Type
+  ) return Prediction_Type
+  is
+    Predicted_Mean       : Propagated_Point_Type := (others => (1));
+    Predicted_Covariance : Covariance_Type := (others => (others => 0));
+  begin
+    for Point_Index in Propagated_Points'Range loop
+      Predicted_Mean := Predicted_Mean + Propagated_Points (Point_Index) * Weights.Mean (Point_Index);
+    end loop;
+
+    for Point_Index in Propagated_Points'Range loop
+      declare
+        Estimate_Difference : Point_Type := Propagated_Points (Point_Index) - Predicted_Mean;
+      begin
+        Predicted_Covariance := Predicted_Covariance + 
+                                Weights.Covariance (Point_Index) * 
+                                Estimate_Difference * 
+                                Transpose (Estimate_Difference) + 
+                                Noise_Covariance;
+      end;
+    end loop;
+
+    return (Mean => Predicted_Mean, Covariance => Predicted_Covariance);
+  end;
   
 end Unscented_Kalman;

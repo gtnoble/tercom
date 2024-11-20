@@ -1,0 +1,16 @@
+name = "test"
+description = "tercom tests"
+version = "0.1.0-dev"
+
+authors = ["Garret Noble"]
+maintainers = ["Garret Noble <garretnoble@gmail.com>"]
+maintainers-logins = ["gtnoble"]
+licenses = "MIT OR Apache-2.0 WITH LLVM-exception"
+website = ""
+tags = []
+
+[[depends-on]]
+tercom = "*"              # Any version of the main crate
+aunit = "*"                 # We can have dependencies for testing only
+[[pins]]
+tercom = { path = ".." }  # Overridden by the latest sources
