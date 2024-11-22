@@ -1,8 +1,10 @@
+with AUnit.Reporter.Text;
 with Aunit.Run;
-with Unscented_Kalman_Test;
+with Unscented_Kalman_Suite; use Unscented_Kalman_suite;
 
 procedure Test is
-   Test_Cases : aliased Unscented_Kalman_Test.Unscented_Kalman_Test;
+   procedure Runner is new AUnit.Run.Test_Runner (Suite);
+   Reporter : AUnit.Reporter.Text.Text_Reporter;
 begin
-   Aunit.Run.Run(Test_Cases'Access);
+   Runner (Reporter);
 end Test;

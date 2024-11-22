@@ -1,4 +1,4 @@
-with Ada.Numerics.Generic_Real_Arrays;
+with Ada.Numerics.Generic_Real_Arrays.Extended;
 
 generic
   type T is digits <>;
@@ -6,8 +6,10 @@ generic
   type State_Vector_Index_Type is range <>;
   type Measurement_Vector_Index_Type is range <>;
 package Unscented_Kalman is
-  package Data_Arrays is new Ada.Numerics.Generic_Real_Arrays (T);
+  package Data_Arrays is new Ada.Numerics.Generic_Real_Arrays(T);
   use Data_Arrays;
+  package Extended_Matrix is new Data_Arrays.Extended;
+  use Extended_Matrix;
   
   subtype Sigma_Points_Index_Range is Integer 
    range 
@@ -22,14 +24,14 @@ package Unscented_Kalman is
       Integer (Measurement_Vector_Index_Type'First) .. 
       Integer (Measurement_Vector_Index_Type'Last);
   
-  type Weights is new Real_Vector (Sigma_Points_Index_Range);
-  type Sigma_Point_States is new Real_Matrix (Sigma_Points_Index_Range, State_Vector_Index_Range);
+  subtype Weights is Real_Vector (Sigma_Points_Index_Range);
+  subtype Sigma_Point_States is Real_Matrix (Sigma_Points_Index_Range, State_Vector_Index_Range);
 
-  type State is new Real_Vector (State_Vector_Index_Range);
-  type State_Covariance is new Real_Matrix (State_Vector_Index_Range, State_Vector_Index_Range);
+  subtype State is Real_Vector (State_Vector_Index_Range);
+  subtype State_Covariance is Real_Matrix (State_Vector_Index_Range, State_Vector_Index_Range);
 
-  type Measurement is new Real_Vector (Measurement_Vector_Index_Range);
-  type Measurement_Covariance is new Real_Matrix (Measurement_Vector_Index_Range, Measurement_Vector_Index_Range);
+  subtype Measurement is Real_Vector (Measurement_Vector_Index_Range);
+  subtype Measurement_Covariance is Real_Matrix (Measurement_Vector_Index_Range, Measurement_Vector_Index_Range);
   
   type Transition_Function is access function (
     Current_State : State
@@ -39,15 +41,13 @@ package Unscented_Kalman is
     Measurement: State
   ) return Measurement;
   
-  type State_Statistics is record
-    Mean       : State;
-    Covariance : State_Covariance;
+  type Statistics (First : Integer; Last : Integer) is record
+     Mean : Real_Vector (First .. Last);
+     Covariance : Real_Matrix (First .. Last, First .. Last);
   end record;
   
-  type Measurement_Statistics is record
-    Mean       : Measurement;
-    Covariance : Measurement_Covariance;
-  end record;
+  subtype State_Statistics is Statistics (State'First, State'Last);
+  subtype Measurement_Statistics is Statistics (Measurement'First, Measurement'Last);
   
   type Sigma_Point_Weights is record
     Mean       : Weights;
@@ -64,6 +64,7 @@ package Unscented_Kalman is
   
   function Update (
     Previous_Prediction          : State_Statistics;
+    Actual_Measurement           : Measurement;
     Sigma_Points                 : in out Sigma_Point_States;
     State_To_Measurement_Map     : Measurement_Function;
     Measurement_Noise_Covariance : Measurement_Covariance;
@@ -73,34 +74,14 @@ package Unscented_Kalman is
   function Get_Weights (Alpha, Beta, Kappa : T) return Sigma_Point_Weights;
 
 private
-  type Cross_Covariance_Matrix is new Real_Matrix (State_Vector_Index_Range, Measurement_Vector_Index_Range);
-  type Sigma_Point_Measurements is new Real_Matrix (Sigma_Points_Index_Range, Measurement_Vector_Index_Range);
+  subtype Cross_Covariance_Matrix is Real_Matrix (State_Vector_Index_Range, Measurement_Vector_Index_Range);
+  subtype Sigma_Point_Measurements is Real_Matrix (Sigma_Points_Index_Range, Measurement_Vector_Index_Range);
 
-  generic
-    type Propagated_Point_Type (<>) is new Real_Vector;
-    type Propagated_Points_Type (<>) is new Real_Matrix;
-    type Covariance_Type (<>) is new Real_Matrix;
-    
-    type Prediction_Type is private;
-  function Predict_Statistics_Generic (
-    Propagated_Points  : Propagated_Points_Type;
+  function Predict_Statistics (
+    Propagated_Points  : Real_Matrix;
     Weights            : Sigma_Point_Weights;
-    Noise_Covariance   : Covariance_Type
-  ) return Prediction_Type;
-
-  function Predict_State_Statistics is new Predict_Statistics_Generic (
-    Propagated_Points_Type => Sigma_Point_States,
-    Propagated_Point_Type => State,
-    Covariance_Type => State_Covariance,
-    Prediction_Type => State_Statistics
-    );
-
-  function Predict_Measurement_Statistics is new Predict_Statistics_Generic (
-    Propagated_Points_Type => Sigma_Point_Measurements,
-    Propagated_Point_Type => Measurement,
-    Covariance_Type => Measurement_Covariance,
-    Prediction_Type => Measurement_Statistics
-  );
+    Noise_Covariance   : Real_Matrix
+  ) return Statistics;
 
   function Update_Sigma_Points (
     Sigma_Points   : in out Sigma_Point_States;
