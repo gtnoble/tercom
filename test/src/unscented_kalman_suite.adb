@@ -11,7 +11,7 @@ package body Unscented_Kalman_Suite is
       Ret : constant Access_Test_Suite := new Test_Suite;
    begin
       Ret.Add_Test
-        (Caller.Create ("Test Get Weights", Test_Get_Weights'Access));
+        (Caller.Create ("Test Make Kalman Filter", Test_Make_Kalman_Filter'Access));
       return Ret;
    end Suite;
 

@@ -14,24 +14,30 @@ package body Unscented_Kalman_Test is
       null;
    end Set_Up;
    
-   procedure Test_Get_Weights (T : in out Unscented_Kalman_Fixture)
-
-   is
-      Alpha : constant Float := 1.0;
-      Beta : constant Float := 2.0;
-      Kappa : constant Float := 3.0;
-      Weights : Test_Kalman_Filter.Sigma_Point_Weights;
+  function Transition_Function (State : State_Vector_Type) return State_Vector_Type
+  is
    begin
-      Weights := Test_Kalman_Filter.Get_Weights (
-         Alpha => Alpha,
-         Beta => Beta,
-         Kappa => Kappa
+      null;
+   end Transition_Function;
+
+  function Measurement_Function (State : State_Vector_type) return Measurement_Vector_Type
+  is
+  begin
+     null;
+  end Measurement_Function;
+   
+   procedure Test_Make_Kalman_Filter (T : in out Unscented_Kalman_Fixture)
+   is
+      Kalman_Filter : Unscented_Kalman_Instance.Kalman_Filter_Access;
+   begin
+      Kalman_Filter := Unscented_Kalman_Instance.Kalman_Filter(
+         Initial_State => Test_Initial_State,
+         Initial_Covariance => Test_Initial_Covariance,
+         State_Transition => Transition_Function,
+         Measurement_Transformation => Measurement_Function,
+         Weight_Parameters => Weight_Parameters
       );
 
-      Assert (
-         Weights.Mean (Weights.Mean'Last) = (1.0 / (2.0 * Alpha ** 2 * Kappa)), 
-         "Unexpected Last Mean Weight"
-      );
-   end Test_Get_Weights;
+   end Test_Make_Kalman_Filter;
 
 end Unscented_Kalman_Test;

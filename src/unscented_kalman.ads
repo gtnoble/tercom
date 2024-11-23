@@ -1,82 +1,95 @@
 with Ada.Numerics.Generic_Real_Arrays.Extended;
+with Ada.Numerics.Generic_Elementary_Functions;
 
 generic
   type T is digits <>;
-  type Sigma_Points_Index is range <>;
-  type State_Vector_Index_Type is range <>;
-  type Measurement_Vector_Index_Type is range <>;
 package Unscented_Kalman is
+   package Math is new Ada.Numerics.Generic_Elementary_Functions (T);
+
   package Data_Arrays is new Ada.Numerics.Generic_Real_Arrays(T);
   use Data_Arrays;
   package Extended_Matrix is new Data_Arrays.Extended;
   use Extended_Matrix;
   
-  subtype Sigma_Points_Index_Range is Integer 
-   range 
-      Integer (Sigma_Points_Index'First) .. 
-      Integer (Sigma_Points_Index'Last);
-  subtype State_Vector_Index_Range is Integer 
-   range 
-      Integer (State_Vector_Index_Type'First) .. 
-      Integer (State_Vector_Index_Type'Last);
-  subtype Measurement_Vector_Index_Range is Integer 
-   range 
-      Integer (Measurement_Vector_Index_Type'First) .. 
-      Integer (Measurement_Vector_Index_Type'Last);
-  
-  subtype Weights is Real_Vector (Sigma_Points_Index_Range);
-  subtype Sigma_Point_States is Real_Matrix (Sigma_Points_Index_Range, State_Vector_Index_Range);
+  type State_Vector_Type is array (Positive range <>) of T;
+  type State_Covariance_Type is array (Positive range <>, Positive range <>) of T;
 
-  subtype State is Real_Vector (State_Vector_Index_Range);
-  subtype State_Covariance is Real_Matrix (State_Vector_Index_Range, State_Vector_Index_Range);
-
-  subtype Measurement is Real_Vector (Measurement_Vector_Index_Range);
-  subtype Measurement_Covariance is Real_Matrix (Measurement_Vector_Index_Range, Measurement_Vector_Index_Range);
+  type Measurement_Vector_Type is array (Positive range <>) of T;
+  type Measurement_Covariance_Type is array (Positive range <>, Positive range <>) of T;
+   
+  type Kalman_Filter_Type (
+   Num_Sigma_Points : Positive;
+   State_Vector_Dimensionality: Positive
+   ) is private;
+  type Kalman_Filter_Access is access Kalman_Filter_Type;
   
   type Transition_Function is access function (
-    Current_State : State
-  ) return State;
+   Input : State_Vector_Type
+  ) return State_Vector_Type;
   
   type Measurement_Function is access function (
-    Measurement: State
-  ) return Measurement;
+   Input : State_Vector_Type
+  ) return Measurement_Vector_Type;
   
-  type Statistics (First : Integer; Last : Integer) is record
-     Mean : Real_Vector (First .. Last);
-     Covariance : Real_Matrix (First .. Last, First .. Last);
+  type Statistics (Point_Dimensionality : Positive) is record
+     Mean : Real_Vector (1 .. Point_Dimensionality);
+     Covariance : Real_Matrix (1 .. Point_Dimensionality, 1 .. Point_Dimensionality);
   end record;
   
-  subtype State_Statistics is Statistics (State'First, State'Last);
-  subtype Measurement_Statistics is Statistics (Measurement'First, Measurement'Last);
+  type State_Statistics is new Statistics;
+
+  type Sigma_Weight_Parameters is record
+   Alpha : T;
+   Beta : T;
+   Kappa : T;
+   end record;
   
-  type Sigma_Point_Weights is record
-    Mean       : Weights;
-    Covariance : Weights;
-  end record;
+  function Kalman_Filter (
+   Initial_State : State_Vector_Type;
+   Initial_Covariance : State_Covariance_Type;
+   State_Transition : Transition_Function;
+   Measurement_Transformation : Measurement_Function;
+   Weight_Parameters : Sigma_Weight_Parameters;
+   Num_Sigma_Points : Positive
+  ) return Kalman_Filter_Access;
   
   function Predict (
-    Previous_Update             : State_Statistics;
-    Sigma_Points                : Sigma_Point_States;
-    State_To_Next_Map           : Transition_Function;
-    Transition_Noise_Covariance : State_Covariance;
-    Weights                     : Sigma_Point_Weights
-  ) return State_Statistics;
+   Filter : in out Kalman_Filter_Access;
+   Transition_Noise_Covariance : State_Covariance_Type
+  ) return Statistics;
   
   function Update (
-    Previous_Prediction          : State_Statistics;
-    Actual_Measurement           : Measurement;
-    Sigma_Points                 : in out Sigma_Point_States;
-    State_To_Measurement_Map     : Measurement_Function;
-    Measurement_Noise_Covariance : Measurement_Covariance;
-    Weights                      : Sigma_Point_Weights
-  ) return State_Statistics;
-
-  function Get_Weights (Alpha, Beta, Kappa : T) return Sigma_Point_Weights;
+   Filter : in out Kalman_Filter_Access;
+    Actual_Measurement           : Measurement_Vector_Type;
+    Measurement_Noise_Covariance : Measurement_Covariance_Type
+  ) return Statistics;
 
 private
-  subtype Cross_Covariance_Matrix is Real_Matrix (State_Vector_Index_Range, Measurement_Vector_Index_Range);
-  subtype Sigma_Point_Measurements is Real_Matrix (Sigma_Points_Index_Range, Measurement_Vector_Index_Range);
+   type Sigma_Points_Type is new Real_Matrix;
+  
+  type Measurement_Statistics is new Statistics;
 
+  type Sigma_Measurements_Type is new Real_Matrix;
+
+  type Sigma_Point_Weights (Num_Sigma_Points : Positive) is record
+    Mean       : Real_Vector (1 .. Num_Sigma_Points);
+    Covariance : Real_Vector (1  .. Num_Sigma_Points);
+  end record;
+  
+   type Kalman_Filter_Type (
+      Num_Sigma_Points : Positive; 
+      State_Vector_Dimensionality : Positive) 
+   is record
+      Current_Statistics : State_Statistics (State_Vector_Dimensionality);
+      Sigma_Points : Sigma_Points_Type (1 .. Num_Sigma_Points, 1 .. State_Vector_Dimensionality);
+      State_Transition : Transition_Function;
+      Measurement_Transformation : Measurement_Function;
+      Weight_Parameters : Sigma_Weight_Parameters;
+      Weights : Sigma_Point_Weights (Num_Sigma_Points);
+   end record;
+   
+  function Get_Weights (Alpha, Beta, Kappa : T) return Sigma_Point_Weights;
+  
   function Predict_Statistics (
     Propagated_Points  : Real_Matrix;
     Weights            : Sigma_Point_Weights;
@@ -84,8 +97,10 @@ private
   ) return Statistics;
 
   function Update_Sigma_Points (
-    Sigma_Points   : in out Sigma_Point_States;
-    State_Estimate : State_Statistics
-  ) return Sigma_Point_States;
+    Sigma_Points   : Sigma_Points_Type;
+    State_Estimate : State_Statistics;
+    Alpha : T;
+    Kappa : T
+  ) return Sigma_Points_Type;
 
 end Unscented_Kalman;
