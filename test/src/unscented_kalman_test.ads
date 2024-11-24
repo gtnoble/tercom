@@ -21,8 +21,8 @@ package Unscented_Kalman_Test is
   
   function Name (T : Unscented_Kalman_Fixture) return Message_String;
   
-  function Transition_Function (State : State_Vector_Type) return State_Vector_Type;
-  function Measurement_Function (State : State_Vector_type) return Measurement_Vector_Type;
+  function Transition_Function (State : State_Point_Type) return State_Point_Type;
+  function Measurement_Function (State : State_Point_Type) return Measurement_Point_Type;
   
   procedure Test_Make_Kalman_Filter (T : in out Unscented_Kalman_Fixture);
   --procedure Test_Predict (T : in out Test_Cases.Test_Case'Class);
@@ -34,7 +34,7 @@ private
       Kappa => 3.0
    );
    
-   Test_Initial_State : State_Vector_Type := 
+   Test_Initial_State : State_Point_Type := 
       (0.0, 0.0);
    Test_Initial_Covariance : State_Covariance_Type := 
       (

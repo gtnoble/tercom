@@ -3,38 +3,43 @@ package body Unscented_Kalman is
   function Predict (
    Filter : in out Kalman_Filter_Access;
    Transition_Noise_Covariance : State_Covariance_Type
-  ) return State_Statistics;
+  ) return State_Statistics
   is
-    Propagated_Sigma_Points : Sigma_Points_Type;
+    Propagated_Sigma_Points : Sigma_Points_Type (
+      Filter.Sigma_Points'Range(1),
+      Filter.Sigma_Points'Range(2)
+      );
    begin
     for Index in Filter.Sigma_Points'Range loop
-      Set_Row(
-         Index, 
-         Propagated_Sigma_Points, 
-         State_To_Next_Map (Get_Row(Index, Filter.Sigma_Points))
+       Propagated_Sigma_Points (Index) := Filter.State_Transition (
+         Filter.Sigma_Points (Index)
       );
     end loop;
     
     Filter.Current_Statistics := Predict_Statistics (
       Propagated_Sigma_Points, 
       Filter.Weights,
-      Transition_Noise_Covariance
+      Real_Matrix (Transition_Noise_Covariance)
    );
    return Filter.Current_Statistics;
   end Predict;
   
   function Update (
    Filter : in out Kalman_Filter_Access;
-    Actual_Measurement           : Measurement_Vector_Type;
-    Measurement_Noise_Covariance : Measurement_Covariance_Type;
-  ) return State_Statistics;
+    Actual_Measurement           : Measurement_Point_Type;
+    Measurement_Noise_Covariance : Measurement_Covariance_Type
+  ) return State_Statistics
   is
     
-    Propagated_Measurement_Points : Sigma_Measurements_Type;
-    Measurement_Prediction : Measurement_Statistics;
-    Kalman_Gain : Measurement_Covariance_Type;
-  begin
-
+    Propagated_Measurement_Points : Sigma_Measurements_Type (
+      Filter.Sigma_Points'Range, 
+      Actual_Measurement'Range
+   );
+    Measurement_Prediction : Measurement_Statistics (Actual_Measurement'Length);
+    Kalman_Gain : Kalman_Gain_Type (
+      Actual_Measurement'Range, 
+      Actual_Measurement'Range
+   );
     begin
       Filter.Sigma_Points := Update_Sigma_Points(
          Filter.Sigma_Points, 
@@ -44,11 +49,10 @@ package body Unscented_Kalman is
       );
 
        for Index in Filter.Sigma_Points'Range loop
-          Set_Row (
-            Index, 
-            Propagated_Measurement_Points, 
-            Filter.State_To_Measurement_Map (Get_Row (Index, Filter.Sigma_Points))
-         );
+          Propagated_Measurement_Points (Index) :=
+            Filter.Measurement_Transformation (
+               Filter.Sigma_Points (Index)
+            );
        end loop;
 
        Measurement_Prediction := Predict_Statistics(
@@ -58,16 +62,15 @@ package body Unscented_Kalman is
        );
        
        declare
-         State_Measurement_Cross_Covariance : Cross_Covariance_Matrix := (others => (others => 0));
+         State_Measurement_Cross_Covariance : Cross_Covariance_Type := (others => (others => 0));
        begin
-         for Index in Sigma_Points'Range loop
+         for Index in Filter.Sigma_Points'Range loop
            State_Measurement_Cross_Covariance := State_Measurement_Cross_Covariance +
                                                  Filter.Weights.Covariance (Index) *
-                                                 To_Column_Vector (Get_Row(Index, Filter.Sigma_Points) - Filter.Current_Statistics.Mean) *
-                                                 To_Row_Vector (
+                                                 Calculate_Cross_Covariance (
+                                                   Filter.Sigma_Points (Index) - Filter.Current_Statistics.Mean,
                                                    Propagated_Measurement_Points (Index) - Measurement_Prediction.Mean
-                                                 ) +
-                                                 Measurement_Noise_Covariance;
+                                                   );
          end loop;
          Kalman_Gain := State_Measurement_Cross_Covariance * Inverse (Measurement_Prediction.Covariance);
        end;
@@ -78,17 +81,21 @@ package body Unscented_Kalman is
                           Kalman_Gain * 
                           Measurement_Prediction.Covariance * 
                           Transpose (Kalman_Gain));
+    return Filter.Current_Statistics;
   end Update;
 
   
-  function Get_Weights (Alpha, Beta, Kappa : T) return Sigma_Point_Weights
+  function Get_Weights (
+   Alpha, Beta, Kappa : T; 
+   Num_Sigma_Points : Positive
+   ) return Sigma_Point_Weights
   is
-    Resulting_Weights : Weights_Type;
+    Resulting_Weights : Sigma_Point_Weights (Num_Sigma_Points);
   begin
     declare
-      Mean_Weights : Weights_Type := (others => (1 / (2 * Alpha ** 2 * Kappa)));
-      Covariance_Weights : Weights_Type := Mean_Weights;
-      Center_Element_Index : Sigma_Points_Vector_Range := (Resulting_Weights'First + Resulting_Weights'Last) / 2;
+      Mean_Weights : Sigma_Point_Weight_Type := (others => (1 / (2 * Alpha ** 2 * Kappa)));
+      Covariance_Weights : Sigma_Point_Weight_Type := Mean_Weights;
+      Center_Element_Index : Positive := (Resulting_Weights'First + Resulting_Weights'Last) / 2;
     begin
       Mean_Weights (Mean_Weights'First) := (Alpha ** 2 * Kappa - Resulting_Weights'Length / 2) / 
                                            (Alpha ** 2 * Kappa);
@@ -103,32 +110,26 @@ package body Unscented_Kalman is
   end Get_Weights;
   
   function Predict_Statistics (
-    Propagated_Points  : Real_Matrix;
+    Propagated_Points  : Points_Type;
     Weights            : Sigma_Point_Weights;
-    Noise_Covariance   : Real_Matrix
+    Noise_Covariance   : Covariance_Type
   ) return Prediction_Type
   is
    subtype Data_Vector_Range is Propagated_Points'Range(2);
    subtype Point_Type is Real_Vector (Data_Vector_Range);
    subtype Covariance_Type is Real_Matrix (Data_Vector_Range, Data_Vector_Range);
 
-    Predicted_Mean       : Point_Type := (others => (1));
-    Predicted_Covariance : Covariance_Type := (others => (others => 0));
+    Predicted_Mean       : Point_Type := (others => 0.0);
+    Predicted_Covariance : Covariance_Type := Noise_Covariance;
   begin
     for Point_Index in Propagated_Points'Range loop
-      Predicted_Mean := Predicted_Mean + Get_Row (Point_Index, Propagated_Points) * Weights.Mean (Point_Index);
+      Predicted_Mean := Predicted_Mean + Propagated_Points (Point_Index) * Weights.Mean (Point_Index);
     end loop;
 
     for Point_Index in Propagated_Points'Range loop
-      declare
-        Estimate_Difference : Point_Type := Get_Row (Point_Index, Propagated_Points) - Predicted_Mean;
-      begin
-        Predicted_Covariance := Predicted_Covariance + 
-                                Weights.Covariance (Point_Index) * 
-                                Estimate_Difference * 
-                                Transpose (Estimate_Difference) + 
-                                Noise_Covariance;
-      end;
+     Predicted_Covariance := (Propagated_Points (Point_Index) - Predicted_Mean) + 
+                             Weights.Covariance (Point_Index) * 
+                             Calculate_Autocovariance (Estimate_Difference)
     end loop;
 
     return (Mean => Predicted_Mean, Covariance => Predicted_Covariance);
@@ -155,16 +156,17 @@ package body Unscented_Kalman is
            Absolute_State_Bias : State := Alpha * Math.Sqrt (Kappa) * Get_Row (Row_Index, Decomposed_Covariance);
         begin
            if Row_Index <= Middle_Index then
-              Set_Row (Row_Index, Updated_Sigma_Points, State_Estimate.Mean + Absolute_State_Bias);
+              Updated_Sigma_Points (Row_Index) := State_Estimate.Mean + Absolute_State_Bias;
            else
-              Set_Row (Row_Index, Updated_Sigma_Points, State_Estimate.Mean - Absolute_State_Bias);
+              Updated_Sigma_Points (Row_Index) := State_Estimate.Mean - Absolute_State_Bias;
+            end if;
          end;
       end loop;
       return Updated_Sigma_Points;
   end;
   
   function Kalman_Filter (
-   Initial_State : State_Vector_Type;
+   Initial_State : State_Point_Type;
    Initial_Covariance : State_Covariance_Type;
    State_Transition : Transition_Function;
    Measurement_Transformation : Measurement_Function;
@@ -189,5 +191,27 @@ package body Unscented_Kalman is
    );
      return Filter;
   end Kalman_Filter;
+  
+  function Calculate_Cross_Covariance (X, Y : Point_Type) return Covariance_Type
+   is
+      Row_Matrix : Matrix_Type (X'Range, 1);
+      Column_Matrix : Matrix_Type (1, Y'Range);
+   begin
+      for Row in X'Range loop
+         Row_Matrix (Row, 1) := X (Row);
+      end loop;
+
+      for Column in Y'Range loop
+         Column_Matrix (1, Column) := Y (Column);
+      end loop;
+      
+      return Row_Matrix * Column_Matrix;
+   end Calculate_Cross_Covariance;
+   
+   function Calculate_Autocovariance (X : Point_Type) return Covariance_Type
+      is
+      begin
+         return Calculate_Cross_Covariance (X, X);
+      end Calculate_Autocovariance;
   
 end Unscented_Kalman;

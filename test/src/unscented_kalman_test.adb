@@ -17,13 +17,13 @@ package body Unscented_Kalman_Test is
   function Transition_Function (State : State_Vector_Type) return State_Vector_Type
   is
    begin
-      null;
+      return (State (1) + State (2), State(2));
    end Transition_Function;
 
   function Measurement_Function (State : State_Vector_type) return Measurement_Vector_Type
   is
   begin
-     null;
+     return (1 => State (1));
   end Measurement_Function;
    
    procedure Test_Make_Kalman_Filter (T : in out Unscented_Kalman_Fixture)
@@ -33,9 +33,10 @@ package body Unscented_Kalman_Test is
       Kalman_Filter := Unscented_Kalman_Instance.Kalman_Filter(
          Initial_State => Test_Initial_State,
          Initial_Covariance => Test_Initial_Covariance,
-         State_Transition => Transition_Function,
-         Measurement_Transformation => Measurement_Function,
-         Weight_Parameters => Weight_Parameters
+         State_Transition => Transition_Function'Access,
+         Measurement_Transformation => Measurement_Function'Access,
+         Weight_Parameters => Weight_Parameters,
+         Num_Sigma_Points => 3
       );
 
    end Test_Make_Kalman_Filter;
