@@ -14,13 +14,13 @@ package body Unscented_Kalman_Test is
       null;
    end Set_Up;
    
-  function Transition_Function (State : State_Vector_Type) return State_Vector_Type
+  function Transition_Function (State : State_Point_Type) return State_Point_Type
   is
    begin
       return (State (1) + State (2), State(2));
    end Transition_Function;
 
-  function Measurement_Function (State : State_Vector_type) return Measurement_Vector_Type
+  function Measurement_Function (State : State_Point_Type) return Measurement_Point_Type
   is
   begin
      return (1 => State (1));
