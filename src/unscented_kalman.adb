@@ -1,235 +1,225 @@
 package body Unscented_Kalman is
   
   function Predict (
-   Filter : in out Kalman_Filter_Access;
+   Filter : in out Kalman_Filter_Type;
    Transition_Noise_Covariance : State_Covariance_Type
-  ) return State_Statistics
+  ) return State_Statistics_Type
   is
-    Propagated_Sigma_Points : Sigma_Points_Type;
+     use Data_Points;
+     Current_Sigma_Points : State_Points_Type := Filter.Sigma_Points;
+    Propagated_Sigma_Points : State_Points_Type;
    begin
     for Index in 
-      Filter.Sigma_Points.First_Index .. Filter.Sigma_Points.Last_Index 
+      First (Current_Sigma_Points) .. Last (Current_Sigma_Points)
    loop
-       Points_Vectors.Append (
+      Set (
          Propagated_Sigma_Points, 
-         Filter.State_Transition (Filter.Sigma_Points (Index))
+         Index, 
+         Filter.State_Transition (
+            Get (Current_Sigma_Points, Index))
          );
     end loop;
     
     Filter.Current_Statistics := Predict_Statistics (
       Propagated_Sigma_Points, 
-      Filter.Weights,
-      Real_Matrix (Transition_Noise_Covariance)
+      Filter.Mean_Weight,
+      Filter.Covariance_Weight,
+      Transition_Noise_Covariance
    );
    return Filter.Current_Statistics;
   end Predict;
   
   function Update (
-   Filter : in out Kalman_Filter_Access;
+   Filter : in out Kalman_Filter_Type;
     Actual_Measurement           : Measurement_Point_Type;
     Measurement_Noise_Covariance : Measurement_Covariance_Type
-  ) return State_Statistics
+  ) return State_Statistics_Type
   is
+     use Data_Points;
+     use Data_Point;
     
     Propagated_Measurement_Points : Measurement_Points_Type;
-    Measurement_Prediction : Measurement_Statistics (Actual_Measurement'Length);
+    Measurement_Prediction : Measurement_Statistics_Type;
     Kalman_Gain : Kalman_Gain_Type (
       Actual_Measurement'Range, 
       Actual_Measurement'Range
    );
     begin
-      Filter.Sigma_Points := Update_Sigma_Points(
+      Update_Sigma_Points(
          Filter.Sigma_Points, 
          Filter.Current_Statistics, 
-         Filter.Weight_Parameters.Alpha, 
-         Filter.Weight_Parameters.Kappa
+         Filter.Mean_Weight (0)
       );
 
-       for Index in Filter.Sigma_Points.First_Index .. Filter.Sigma_Points.Last_Index loop
-          Points_Vectors.Append (
-            Propagated_Measurement_Points, 
-            Filter.Measurement_Transformation (
-               Filter.Sigma_Points (Index)
-            )
-         );
+       for Index in First (Filter.Sigma_Points) .. Last (Filter.Sigma_Points) loop
+          Set (
+            Points =>Propagated_Measurement_Points,
+             Index => Index,
+             Value => Filter.Measurement_Transformation (
+               Get (Filter.Sigma_Points, Index)
+             ));
        end loop;
 
        Measurement_Prediction := Predict_Statistics(
          Propagated_Measurement_Points, 
-         Filter.Weights, 
+         Filter.Mean_Weight,
+         Filter.Covariance_Weight, 
          Measurement_Noise_Covariance
        );
        
        declare
          State_Measurement_Cross_Covariance : Cross_Covariance_Type(
-            Filter.Sigma_Points.First_Element'Range, 
-            Propagated_Measurement_Points.First_Element'Range
+            Point_First (Filter.Sigma_Points) .. Point_Last (Filter.Sigma_Points), 
+            Point_First (Propagated_Measurement_Points) .. Point_Last (Propagated_Measurement_Points)
             ) := (others => (others => 0.0));
        begin
          for Index in 
-            Filter.Sigma_Points.First_Index .. 
-            Filter.Sigma_Points.Last_Index 
+            First (Filter.Sigma_Points) .. 
+            Last (Filter.Sigma_Points)
          loop
            State_Measurement_Cross_Covariance := 
             State_Measurement_Cross_Covariance +
-            Filter.Weights.Covariance (Index) *
+            Filter.Covariance_Weight (Index) *
             Calculate_Cross_Covariance (
-               Filter.Sigma_Points (Index) - Filter.Current_Statistics.Mean,
-               Propagated_Measurement_Points (Index) - Measurement_Prediction.Mean
+               Get (Filter.Sigma_Points, Index) - Mean (Filter.Current_Statistics),
+               Get (Propagated_Measurement_Points, Index) - Mean (Measurement_Prediction)
             );
          end loop;
-         Kalman_Gain := State_Measurement_Cross_Covariance * Inverse (Measurement_Prediction.Covariance);
+         Kalman_Gain := State_Measurement_Cross_Covariance * Inverse (Covariance (Measurement_Prediction));
        end;
     
-    Filter.Current_Statistics := (
-      Point_Dimension => Filter.Sigma_Points.First_Element'Length,
-      Mean => Filter.Current_Statistics.Mean + 
-               Kalman_Gain * (Actual_Measurement - Measurement_Prediction.Mean),
-      Covariance => Filter.Current_Statistics.Covariance - 
+    Filter.Current_Statistics := Make_Statistics (
+      Mean => Mean (Filter.Current_Statistics) + 
+               Kalman_Gain * (Actual_Measurement - Mean (Measurement_Prediction)),
+      Covariance => Covariance (Filter.Current_Statistics) - 
                      Kalman_Gain * 
-                     Measurement_Prediction.Covariance * 
+                     Covariance (Measurement_Prediction) * 
                      Transpose (Kalman_Gain));
     return Filter.Current_Statistics;
   end Update;
 
   
-  function Get_Weights (
-   Alpha, Beta, Kappa : T; 
-   Num_Sigma_Points : Positive
-   ) return Sigma_Point_Weights
-  is
-    Resulting_Weights : Sigma_Point_Weights (Num_Sigma_Points);
-  begin
-    declare
-      Mean_Weights : Sigma_Point_Weight_Type (
-         Resulting_Weights.Mean'Range
-      ) := (others => (1.0 / (2.0 * Alpha ** 2 * Kappa)));
-      Covariance_Weights : Sigma_Point_Weight_Type (
-         Resulting_Weights.Covariance'Range
-      ) := Mean_Weights;
-      Center_Element_Index : Positive := (
-         Resulting_Weights.Mean'First + Resulting_Weights.Mean'Last
-      ) / 2;
-    begin
-      Mean_Weights (Mean_Weights'First) := (Alpha ** 2 * Kappa - T (Resulting_Weights.Mean'Length) / 2.0) / 
-                                           (Alpha ** 2 * Kappa);
-      Covariance_Weights (Covariance_Weights'First) := Mean_Weights (Mean_Weights'First) + 
-                                                       1.0 - 
-                                                       Alpha ** 2 + 
-                                                       Beta;
-      Resulting_Weights.Covariance := Covariance_Weights;
-      Resulting_Weights.Mean := Mean_Weights;
-    end;
-    return Resulting_Weights;
-  end Get_Weights;
-  
-  function Predict_Statistics (
-    Propagated_Points  : Points_Type;
-    Weights            : Sigma_Point_Weights;
-    Noise_Covariance   : Covariance_Type
-  ) return Statistics
-  is
-    Predicted_Mean       : Point_Type (
-      Propagated_Points.First_Element'Range
-      ) := (others => 0.0);
-    Predicted_Covariance : Covariance_Type := Noise_Covariance;
-
-    First_Point_Index : Integer := Propagated_Points.First_Index;
-    Last_Point_Index : Integer := Propagated_Points.Last_Index;
-  begin
-    for Point_Index in First_Point_Index .. Last_Point_Index loop
-      Predicted_Mean := Predicted_Mean + 
-         Propagated_Points (Point_Index) * Weights.Mean (Point_Index);
-    end loop;
-
-    for Point_Index in First_Point_Index .. Last_Point_Index loop
-     Predicted_Covariance :=  Weights.Covariance (Point_Index) * 
-                             Calculate_Autocovariance (
-                              Propagated_Points (Point_Index) - Predicted_Mean
-                              );
-    end loop;
-
-    return (
-       Point_Dimension => Predicted_Mean'Length,
-      Mean => Predicted_Mean, 
-      Covariance => Predicted_Covariance);
-  end;
+  function Mean_Weight (
+   Index : Sigma_Point_Index_Type;
+   Alpha, Kappa : Float_Type) return Float_Type
+   is
+      L : Sigma_Point_Index_Type := (Index'Last - Index'First) / 2;
+      Weight : Float_Type;
+   begin
+      if Index = 0 then
+         Weight := (Alpha ** 2 * Kappa - L)  / (Alpha ** 2 * Kappa);
+      else
+         Weight := 1 / (2 * Alpha ** 2 * Kappa);
+      end if;
+      return Weight;
+   end Mean_Weight;
+   
+   function Covariance_Weight (
+      Index : Sigma_Point_Index_Type;
+      Alpha, Beta, Kappa : Float_Type
+   ) return Float_Type
+   is
+      Weight : Float_Type;
+   begin
+      if Index = 0 then
+         Weight := 
+            Mean_Weight (Index => Index, Alpha => Alpha, Kappa => Kappa) +
+            1 - Alpha ** 2 + Beta;
+      else
+         Weight := Mean_Weight (Index => Index, Alpha => Alpha, Kappa => Kappa);
+      end if;
+      return Weight;
+   end Covariance_Weight;
   
   procedure Update_Sigma_Points (
-    Sigma_Points   : in out Sigma_Points_Type;
-    State_Estimate : State_Statistics;
-    Alpha : T;
-    Kappa : T
-  ) return Sigma_Points_Type
+    Sigma_Points   : in out State_Points_Type;
+    State_Estimate : State_Statistics_Type;
+    Center_Weight : Float_Type
+  )
   is
-     Start_Row_Index : Integer := Sigma_Points.First_Index;
-     End_Row_Index : Integer := Sigma_Points.Last_Index;
-     Number_Rows : Natural := Natural (Sigma_Points.Length);
+     use Data_Point;
+     use Data_Points;
+
+     Start_Row_Index : Integer := First (Sigma_Points);
+     End_Row_Index : Integer := Last (Sigma_Points);
+     Number_Rows : Natural := Natural (Num_Points (Sigma_Points));
      Middle_Index : Integer :=  (Start_Row_Index + End_Row_Index) / Number_Rows;
 
-     Decomposed_Covariance : Real_Matrix (State_Estimate.Covariance'Range(1), State_Estimate.Covariance'Range(2));
+     Decomposed_Covariance : Covariance_Type (
+      Covariance (State_Estimate)'Range(1), 
+      Covariance (State_Estimate)'Range(2)
+      );
   begin
      Decomposed_Covariance := Cholesky_Decomposition (State_Estimate.Covariance);
      for Row_Index in Start_Row_Index .. End_Row_Index loop
         declare
-           Absolute_State_Bias : State_Point_Type := Alpha * Math.Sqrt (Kappa) * Decomposed_Covariance (Row_Index);
+           Absolute_State_Bias : Displacement_Type := Center_Weight * Decomposed_Covariance (Row_Index);
         begin
-           if Row_Index <= Middle_Index then
-              Sigma_Points (Row_Index) := State_Estimate.Mean + Absolute_State_Bias;
+           if Row_Index = 0 then
+              Set (Sigma_Points, Row_Index, Mean (State_Estimate));
+           elsif Row_Index < 0 then
+              Set (Sigma_Points, Row_Index, Mean (State_Estimate) + Absolute_State_Bias);
            else
-              Sigma_Points (Row_Index) := State_Estimate.Mean - Absolute_State_Bias;
+              Set (Sigma_Points, Row_Index, Mean (State_Estimate) - Absolute_State_Bias);
             end if;
          end;
       end loop;
-  end;
+  end Update_Sigma_Points;
   
-  function Kalman_Filter (
+  function Make_Kalman_Filter (
    Initial_State : State_Point_Type;
    Initial_Covariance : State_Covariance_Type;
    State_Transition : Transition_Function;
    Measurement_Transformation : Measurement_Function;
-   Weight_Parameters : Sigma_Weight_Parameters;
-   Num_Sigma_Points : Positive
-  ) return Kalman_Filter_Access
+   Num_Sigma_Points : Positive;
+   Weight_Parameters : Sigma_Weight_Parameters
+  ) return Kalman_Filter_Type
   is
-     Filter : Kalman_Filter_Access;
-  begin
-     Filter := new Kalman_Filter_Type (Num_Sigma_Points);
-     Filter.Current_Statistics := (
-      Mean => Real_Vector (Initial_State), 
-      Covariance => Real_Matrix (Initial_Covariance)
-      );
-     Filter.State_Transition := State_Transition;
-     Filter.Measurement_Transformation := Measurement_Transformation;
-     Filter.Weight_Parameters := Weight_Parameters;
-     Filter.Weights := Get_Weights (
-      Weight_Parameters.Alpha, 
-      Weight_Parameters.Beta, 
-      Weight_Parameters.Kappa
-   );
-     return Filter;
-  end Kalman_Filter;
-  
-  function Calculate_Cross_Covariance (X, Y : Point_Type) return Covariance_Type
-   is
-      Row_Matrix : Matrix_Type (X'Range, 1);
-      Column_Matrix : Matrix_Type (1, Y'Range);
-   begin
-      for Row in X'Range loop
-         Row_Matrix (Row, 1) := X (Row);
-      end loop;
+     use Data_Points;
+     Sigma_Points_Index_Start : Integer := - Num_Sigma_Points / 2;
+     Sigma_Points_Index_End : Integer := Num_Sigma_Points / 2;
 
-      for Column in Y'Range loop
-         Column_Matrix (1, Column) := Y (Column);
-      end loop;
-      
-      return Row_Matrix * Column_Matrix;
-   end Calculate_Cross_Covariance;
-   
-   function Calculate_Autocovariance (X : Point_Type) return Covariance_Type
+     function Mean_Weight_Function (Index : Sigma_Point_Index_Type) return Float_Type
       is
       begin
-         return Calculate_Cross_Covariance (X, X);
-      end Calculate_Autocovariance;
+         return Mean_Weight (
+            Index => Index, 
+            Alpha => Weight_Parameters.Alpha, 
+            Kappa => Weight_Parameters.Kappa
+         );
+      end Mean_Weight_Function;
+      
+      function Covariance_Weight_Function (Index : Sigma_Point_Index_Type) return Float_Type
+      is
+      begin
+         return Covariance_Weight (
+            Index => Index, 
+            Alpha => Weight_Parameters.Alpha, 
+            Beta => Weight_Parameters.Beta, 
+            Kappa => Weight_Parameters.Kappa);
+      end Covariance_Weight_Function;
+
+     Filter : Kalman_Filter_Type := (Current_Statistics =>
+                                       Make_Statistics (Initial_State, Initial_Covariance),
+                                     Sigma_Points =>
+                                       New_Points (
+                                          Sigma_Points_Index_Start, 
+                                          Sigma_Points_Index_End
+                                       ),
+                                     State_Transition =>
+                                       Transition_Function,
+                                     Measurement_Transformation =>
+                                       Measurement_Function,
+                                    Mean_Weight => Mean_Weight_Function'Access, 
+                                    Covariance_Weight => Covariance_Weight_Function'Access);
+  begin
+     Update_Sigma_Points (
+      Sigma_Points => Filter.Sigma_Points, 
+      State_Estimate => Filter.Current_Statistics, 
+      Alpha => Filter.Weight_Parameters.Alpha,
+      Kappa => Filter.Weight_Parameters.Kappa
+      );
+     return Filter;
+  end Make_Kalman_Filter;
   
 end Unscented_Kalman;

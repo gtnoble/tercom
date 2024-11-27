@@ -2,21 +2,20 @@ with Aunit; use Aunit;
 with Aunit.Test_Fixtures;
 with Unscented_Kalman;
 with Ada.Numerics.Generic_Real_Arrays;
+with Point;
 
 package Unscented_Kalman_Test is
    
-  package Matrix is new Ada.Numerics.Generic_Real_Arrays (Float);
+   subtype Float_Type is Float;
+  package Matrix is new Ada.Numerics.Generic_Real_Arrays (Float_Type);
   
   type Unscented_Kalman_Fixture is new Aunit.Test_Fixtures.Test_Fixture with null record;
   
-
   package Unscented_Kalman_Instance is new Unscented_Kalman (
    Float
    );
   use Unscented_Kalman_Instance;
 
-  subtype Test_Measurement_Vector is Matrix.Real_Vector ( 1 .. 1 );
-  
    procedure Set_Up (T : in out Unscented_Kalman_Fixture);
   
   function Name (T : Unscented_Kalman_Fixture) return Message_String;

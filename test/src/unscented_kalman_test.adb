@@ -28,15 +28,14 @@ package body Unscented_Kalman_Test is
    
    procedure Test_Make_Kalman_Filter (T : in out Unscented_Kalman_Fixture)
    is
-      Kalman_Filter : Unscented_Kalman_Instance.Kalman_Filter_Access;
+      Kalman_Filter : Unscented_Kalman_Instance.Kalman_Filter_Type;
    begin
-      Kalman_Filter := Unscented_Kalman_Instance.Kalman_Filter(
+      Kalman_Filter := Unscented_Kalman_Instance.Make_Kalman_Filter(
          Initial_State => Test_Initial_State,
          Initial_Covariance => Test_Initial_Covariance,
          State_Transition => Transition_Function'Access,
          Measurement_Transformation => Measurement_Function'Access,
-         Weight_Parameters => Weight_Parameters,
-         Num_Sigma_Points => 3
+         Weight_Parameters => Weight_Parameters
       );
 
    end Test_Make_Kalman_Filter;
