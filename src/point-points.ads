@@ -6,13 +6,7 @@ generic
    type Points_Index_Type is range <>;
 package Point.Points is
    
-  type Statistics_Type is private;
-  
   type Points_Type is private;
-  
-  type Weight_Function is access function (
-   Index : Points_Index_Type
-  ) return Float_Type;
   
   function New_Points (
    Points_Start_Index, Points_End_Index : Points_Index_Type
@@ -31,34 +25,22 @@ package Point.Points is
   function Points_To_Matrix (X : Points_Type) return Matrix_Type;
   function Matrix_To_Points (X : Matrix_Type) return Points_Type;
   
-  function Mean (Statistics : Statistics_Type) return Point_Type;
-  function Covariance (Statistics : Statistics_Type) return Covariance_Type;
-  
-  
-  function Predict_Statistics (
-    Propagated_Points  : Points_Type;
-    Mean_Weights       : Weight_Function;
-    Covariance_Weights : Weight_Function;
-    Noise_Covariance   : Covariance_Type
-  ) return Statistics_Type;
-   
-  function Make_Statistics (Mean : Point_Type; Covariance : Covariance_Type) return Statistics_Type;
 private
 
-  type Points_Array_Type is array (Points_Index_Type) of Point_Holder_Type;
+   package Point_Holders is new Ada.Containers.Indefinite_Holders (Point_Type);
+   use type Point_Holders.Holder;
+   use type Point_Holders.Reference_Type;
+
+  type Points_Array_Type is array (Points_Index_Type) of Point_Holders.Holder;
+
   package Points_Array_Holders is new Ada.Containers.Indefinite_Holders (Points_Array_Type);
-  use Points_Array_Holders;
-  subtype Points_Array_Holder_Type is Points_Array_Holders.Holder;
+  use type Points_Array_Holders.Holder;
+  use type Points_Array_Holders.Reference_Type;
   
    type Points_Type is record
-      Points : Points_Array_Holder_Type;
+      Points : Points_Array_Holders.Holder;
       Point_Start_Index : Point_Index_Type;
       Point_End_Index : Point_Index_Type;
    end record;
 
-  type Statistics_Type is record
-     Mean : Point_Holder_Type;
-     Covariance : Covariance_Holder_Type;
-  end record;
-  
 end Point.Points;

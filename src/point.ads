@@ -12,16 +12,8 @@ generic
    subtype Matrix_Type is Matrix_Package.Real_Matrix;
 
    type Covariance_Type is array (Point_Index_Type range <>, Point_Index_Type range <>) of Float_Type;
-   package Covariance_Holders is new Ada.Containers.Indefinite_Holders (Covariance_Type);
-   use Covariance_Holders;
-   subtype Covariance_Holder_Type is Covariance_Holders.Holder;
-
    type Point_Type is array (Point_Index_Type range <>) of Float_Type;
-   package Point_Holders is new Ada.Containers.Indefinite_Holders (Point_Type);
-   use Point_Holders;
-   subtype Point_Holder_Type is Point_Holders.Holder;
 
-   type Point_Access is access Point_Type;
    type Displacement_Type is new Vector_Type;
    
    type Inverse_Covariance_Type is new Matrix_Type;
@@ -31,7 +23,7 @@ generic
   function Calculate_Cross_Covariance (X, Y : Displacement_Type) return Covariance_Type;
   function Calculate_Autocovariance (X : Displacement_Type) return Covariance_Type;
   
-  function Point (X : Vector_Type) return Point_Type;
+  function To_Point (X : Vector_Type) return Point_Type;
   
   function "=" (X, Y : Point_Type) return Boolean;
 

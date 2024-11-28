@@ -1,3 +1,5 @@
+   with Ada.Numerics.Generic_Real_Arrays;
+   with Ada.Numerics.Generic_Real_Arrays.Extended;
 package body Unscented_Kalman is
   
   function Predict (
@@ -6,6 +8,8 @@ package body Unscented_Kalman is
   ) return State_Statistics_Type
   is
      use Data_Points;
+     use Data_Statistics;
+
      Current_Sigma_Points : State_Points_Type := Filter.Sigma_Points;
     Propagated_Sigma_Points : State_Points_Type;
    begin
@@ -37,6 +41,9 @@ package body Unscented_Kalman is
   is
      use Data_Points;
      use Data_Point;
+     use Data_Statistics;
+     
+     subtype Measurement_Statistics_Type is Data_Statistics.Statistics_Type;
     
     Propagated_Measurement_Points : Measurement_Points_Type;
     Measurement_Prediction : Measurement_Statistics_Type;
@@ -98,39 +105,6 @@ package body Unscented_Kalman is
     return Filter.Current_Statistics;
   end Update;
 
-  
-  function Mean_Weight (
-   Index : Sigma_Point_Index_Type;
-   Alpha, Kappa : Float_Type) return Float_Type
-   is
-      L : Sigma_Point_Index_Type := (Index'Last - Index'First) / 2;
-      Weight : Float_Type;
-   begin
-      if Index = 0 then
-         Weight := (Alpha ** 2 * Kappa - L)  / (Alpha ** 2 * Kappa);
-      else
-         Weight := 1 / (2 * Alpha ** 2 * Kappa);
-      end if;
-      return Weight;
-   end Mean_Weight;
-   
-   function Covariance_Weight (
-      Index : Sigma_Point_Index_Type;
-      Alpha, Beta, Kappa : Float_Type
-   ) return Float_Type
-   is
-      Weight : Float_Type;
-   begin
-      if Index = 0 then
-         Weight := 
-            Mean_Weight (Index => Index, Alpha => Alpha, Kappa => Kappa) +
-            1 - Alpha ** 2 + Beta;
-      else
-         Weight := Mean_Weight (Index => Index, Alpha => Alpha, Kappa => Kappa);
-      end if;
-      return Weight;
-   end Covariance_Weight;
-  
   procedure Update_Sigma_Points (
     Sigma_Points   : in out State_Points_Type;
     State_Estimate : State_Statistics_Type;
@@ -139,21 +113,33 @@ package body Unscented_Kalman is
   is
      use Data_Point;
      use Data_Points;
+     use Data_Statistics;
+     
+     package Matrix is new Ada.Numerics.Generic_Real_Arrays (Float_Type);
+     package Matrix_Ops is new Matrix.Extended;
+
 
      Start_Row_Index : Integer := First (Sigma_Points);
      End_Row_Index : Integer := Last (Sigma_Points);
      Number_Rows : Natural := Natural (Num_Points (Sigma_Points));
      Middle_Index : Integer :=  (Start_Row_Index + End_Row_Index) / Number_Rows;
 
-     Decomposed_Covariance : Covariance_Type (
-      Covariance (State_Estimate)'Range(1), 
-      Covariance (State_Estimate)'Range(2)
-      );
+     Decomposed_Covariance : Points_Type;
   begin
-     Decomposed_Covariance := Cholesky_Decomposition (State_Estimate.Covariance);
+     Decomposed_Covariance := Matrix_To_Points (
+         Matrix_Type(
+            Matrix_Ops.Cholesky_Decomposition (
+               Matrix.Real_Matrix(
+                  Covariance (State_Estimate)
+               )
+            )
+         )
+      );
      for Row_Index in Start_Row_Index .. End_Row_Index loop
         declare
-           Absolute_State_Bias : Displacement_Type := Center_Weight * Decomposed_Covariance (Row_Index);
+           Absolute_State_Bias : Displacement_Type := Center_Weight * Displacement_Type (
+               Get (Decomposed_Covariance, Row_Index)
+            );
         begin
            if Row_Index = 0 then
               Set (Sigma_Points, Row_Index, Mean (State_Estimate));
@@ -181,35 +167,43 @@ package body Unscented_Kalman is
 
      function Mean_Weight_Function (Index : Sigma_Point_Index_Type) return Float_Type
       is
+         L : Float_Type := Float_Type ((Sigma_Points_Index_End - Sigma_Points_Index_Start) / 2);
+         Weight : Float_Type;
       begin
-         return Mean_Weight (
-            Index => Index, 
-            Alpha => Weight_Parameters.Alpha, 
-            Kappa => Weight_Parameters.Kappa
-         );
+         if Index = 0 then
+            Weight := (Weight_Parameters.Alpha ** 2 * Weight_Parameters.Kappa - L)  / 
+                      (Weight_Parameters.Alpha ** 2 * Weight_Parameters.Kappa);
+         else
+            Weight := 1.0 / (2.0 * Weight_Parameters.Alpha ** 2 * Weight_Parameters.Kappa);
+      end if;
+      return Weight;
       end Mean_Weight_Function;
       
       function Covariance_Weight_Function (Index : Sigma_Point_Index_Type) return Float_Type
       is
+         Weight : Float_Type;
       begin
-         return Covariance_Weight (
-            Index => Index, 
-            Alpha => Weight_Parameters.Alpha, 
-            Beta => Weight_Parameters.Beta, 
-            Kappa => Weight_Parameters.Kappa);
+         if Index = 0 then
+            Weight := 
+               Mean_Weight_Function (Index => Index) +
+               1.0 - Weight_Parameters.Alpha ** 2 + Weight_Parameters.Beta;
+         else
+            Weight := Mean_Weight_Function (Index => Index);
+         end if;
+         return Weight;
       end Covariance_Weight_Function;
 
      Filter : Kalman_Filter_Type := (Current_Statistics =>
-                                       Make_Statistics (Initial_State, Initial_Covariance),
+                                       Data_Statistics.Make_Statistics (Initial_State, Initial_Covariance),
                                      Sigma_Points =>
                                        New_Points (
                                           Sigma_Points_Index_Start, 
                                           Sigma_Points_Index_End
                                        ),
                                      State_Transition =>
-                                       Transition_Function,
+                                       State_Transition,
                                      Measurement_Transformation =>
-                                       Measurement_Function,
+                                       Measurement_Transformation,
                                     Mean_Weight => Mean_Weight_Function'Access, 
                                     Covariance_Weight => Covariance_Weight_Function'Access);
   begin
