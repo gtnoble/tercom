@@ -3,18 +3,17 @@ with Ada.Containers;
 with Ada.Containers.Indefinite_Holders;
 
 generic
-   type Float_Type is digits <>;
    type Point_Index_Type is range <>;
+   with package Matrix_Package is new Ada.Numerics.Generic_Real_Arrays (<>);
 package Point is
-   package Matrix_Package is new Ada.Numerics.Generic_Real_Arrays (Float_Type);
+   use Matrix_Package;
+   subtype Float_Type is Real;
 
-   subtype Vector_Type is Matrix_Package.Real_Vector;
-   subtype Matrix_Type is Matrix_Package.Real_Matrix;
+   subtype Vector_Type is Real_Vector;
+   subtype Matrix_Type is Real_Matrix;
 
-   type Covariance_Type is
-     array
-       (Point_Index_Type range <>, Point_Index_Type range <>) of Float_Type;
-   type Point_Type is array (Point_Index_Type range <>) of Float_Type;
+   type Covariance_Type is new Matrix_Type;
+   type Point_Type is new Vector_Type;
 
    type Displacement_Type is new Vector_Type;
 

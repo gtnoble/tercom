@@ -149,7 +149,6 @@ package body Unscented_Kalman is
       use Data_Points;
       use Data_Statistics;
 
-      package Matrix is new Ada.Numerics.Generic_Real_Arrays (Float_Type);
       package Matrix_Ops is new Matrix.Extended;
 
       Start_Row_Index : Integer := First (Sigma_Points);
