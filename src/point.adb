@@ -38,6 +38,16 @@ package body Point is
       return Displacement_Type (Vector_Type (X) - Vector_Type (Y));
    end "-";
 
+   function "-" (X, Y : Covariance_Type) return Covariance_Type is
+   begin
+      return Covariance_Type (X - Y);
+   end "-";
+
+   function "-" (X : Point_Type; Y : Displacement_Type) return Point_Type is
+   begin
+      return Point_Type (X - Y);
+   end "-";
+
    function "*" (X : Float_Type; Y : Covariance_Type) return Covariance_Type is
    begin
       return Covariance_Type (X * Real_Matrix (Y));
@@ -46,6 +56,11 @@ package body Point is
    function "+" (X, Y : Covariance_Type) return Covariance_Type is
    begin
       return Covariance_Type (Real_Matrix (X) + Real_Matrix (Y));
+   end "+";
+
+   function "+" (X : Point_Type; Y : Displacement_Type) return Point_Type is
+   begin
+      return Point_Type (X + Y);
    end "+";
 
    function Inverse (X : Covariance_Type) return Inverse_Covariance_Type is
@@ -66,5 +81,22 @@ package body Point is
    begin
       return Covariance_Type (Real_Matrix (X) * Real_Matrix (Y));
    end "*";
+
+   function "*"
+     (X : Kalman_Gain_Type; Y : Displacement_Type) return Displacement_Type is
+   begin
+      return Displacement_Type (X * Y);
+   end "*";
+
+   function "*"
+     (X : Covariance_Type; Y : Kalman_Gain_Type) return Covariance_Type is
+   begin
+      return Covariance_Type (X * Y);
+   end "*";
+
+   function Transpose (X : Kalman_Gain_Type) return Kalman_Gain_Type is
+   begin
+      return Kalman_Gain_Type (Transpose (X));
+   end Transpose;
 
 end Point;

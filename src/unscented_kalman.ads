@@ -1,5 +1,7 @@
-with Ada.Numerics.Generic_Real_Arrays.Extended;
+with Ada.Numerics.Generic_Real_Arrays;
 with Ada.Numerics.Generic_Elementary_Functions;
+with Matrix_Operations;
+
 with Point;
 with Point.Points;
 with Point.Statistics;
@@ -10,7 +12,7 @@ package Unscented_Kalman is
 
    subtype Sigma_Point_Index_Type is Integer;
    package Matrix is new Ada.Numerics.Generic_Real_Arrays (Float_Type);
-   package Data_Point is new Point (Sigma_Point_Index_Type, Matrix);
+   package Data_Point is new Point (Matrix);
    package Data_Points is new Data_Point.Points (Sigma_Point_Index_Type);
    package Data_Statistics is new Data_Point.Statistics (Data_Points);
 

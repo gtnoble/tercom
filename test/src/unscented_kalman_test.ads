@@ -32,7 +32,7 @@ private
      (Alpha => 1.0, Beta => 2.0, Kappa => 3.0);
 
    Test_Initial_State      : State_Point_Type      := (0.0, 0.0);
-   Test_Initial_Covariance : State_Covariance_Type := ((0.0, 0.0), (0.0, 0.0));
+   Test_Initial_Covariance : State_Covariance_Type := ((1.0, 0.0), (0.0, 1.0));
    Test_Num_Sigma_Points   : Positive              := 4;
 
 end Unscented_Kalman_Test;

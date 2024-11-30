@@ -1,5 +1,9 @@
+with Ada.Numerics.Generic_Real_Arrays;
+
 generic
-package Ada.Numerics.Generic_Real_Arrays.Extended is
+   with package Real_Arrays is new Ada.Numerics.Generic_Real_Arrays (<>);
+package Matrix_Operations is
+   use Real_Arrays;
 
    function Get_Row (Index : Integer; Matrix : Real_Matrix) return Real_Vector;
    procedure Set_Row (Index : Integer; Matrix : out Real_Matrix; Row : Real_Vector);
@@ -12,4 +16,4 @@ package Ada.Numerics.Generic_Real_Arrays.Extended is
    
    function Cholesky_Decomposition (Matrix : Real_Matrix) return Real_Matrix;
 
-end Ada.Numerics.Generic_Real_Arrays.Extended;
+end Matrix_Operations;

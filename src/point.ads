@@ -3,11 +3,12 @@ with Ada.Containers;
 with Ada.Containers.Indefinite_Holders;
 
 generic
-   type Point_Index_Type is range <>;
    with package Matrix_Package is new Ada.Numerics.Generic_Real_Arrays (<>);
 package Point is
    use Matrix_Package;
    subtype Float_Type is Real;
+
+   subtype Point_Index_Type is Integer; 
 
    subtype Vector_Type is Real_Vector;
    subtype Matrix_Type is Real_Matrix;
@@ -25,8 +26,6 @@ package Point is
      (X, Y : Displacement_Type) return Covariance_Type;
    function Calculate_Autocovariance
      (X : Displacement_Type) return Covariance_Type;
-
-   function To_Point (X : Vector_Type) return Point_Type;
 
    function "=" (X, Y : Point_Type) return Boolean;
 

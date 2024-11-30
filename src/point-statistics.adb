@@ -8,10 +8,12 @@ package body Point.Statistics is
         (Index : Points_Instance.Points_Index_Type) return Float_Type;
       Noise_Covariance   : Covariance_Type) return Statistics_Type
    is
+      use Points_Instance;
+
       Predicted_Mean       :
         Point_Type
-          (Point_First_Index (Propagated_Points) ..
-               Point_Last_Index (Propagated_Points)) :=
+          (Point_First (Propagated_Points) ..
+               Point_Last (Propagated_Points)) :=
         (others => 0.0);
       Predicted_Covariance : Covariance_Type := Noise_Covariance;
    begin

@@ -1,5 +1,5 @@
 with Ada.Numerics.Generic_Real_Arrays;
-with Ada.Numerics.Generic_Real_Arrays.Extended;
+
 package body Unscented_Kalman is
 
    function Predict
@@ -149,7 +149,7 @@ package body Unscented_Kalman is
       use Data_Points;
       use Data_Statistics;
 
-      package Matrix_Ops is new Matrix.Extended;
+      package Matrix_Ops is new Matrix_Operations (Matrix);
 
       Start_Row_Index : Integer := First (Sigma_Points);
       End_Row_Index   : Integer := Last (Sigma_Points);
@@ -201,7 +201,10 @@ package body Unscented_Kalman is
         (Current_Statistics         =>
            Data_Statistics.Make_Statistics (Initial_State, Initial_Covariance),
          Sigma_Points               =>
-           New_Points (Sigma_Points_Index_Start, Sigma_Points_Index_End),
+           New_Points (
+            Fill => Initial_State, 
+            Points_Start_Index => Sigma_Points_Index_Start, 
+            Points_End_Index => Sigma_Points_Index_End),
          State_Transition           => State_Transition,
          Measurement_Transformation => Measurement_Transformation,
          Weight_Parameters          => Weight_Parameters);
