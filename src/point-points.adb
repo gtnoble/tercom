@@ -1,4 +1,5 @@
 package body Point.Points is
+   pragma Assertion_Policy (Check);
 
    function Make_Points 
       (Points_Start_Index, Points_End_Index : Points_Index_Type;
@@ -45,6 +46,9 @@ package body Point.Points is
    procedure Set
      (Points : in out Points_Type; Index : Points_Index_Type; Value : Point_Type)
    is
+      pragma Assert (Points.Point_Start_Index = Value'First, "All points must have the same starting index");
+      pragma Assert (Points.Point_End_Index = Value'Last, "All points must have the same final index");
+
       Point_Element_Container : Point_Holders.Holder :=
         Element (Points.Points) (Index);
    begin
@@ -71,7 +75,7 @@ package body Point.Points is
          (Points_Start_Index => Points_Index_Type (Matrix'First(1)), 
          Points_End_Index => Points_Index_Type (Matrix'Last(1)),
          Point_Start_Index   => Point_Index_Type (Matrix'First(2)), 
-         Point_End_Index  => Point_Index_Type (Matrix'First(2)));
+         Point_End_Index  => Point_Index_Type (Matrix'Last(2)));
    begin
       for Row_Index in Matrix'Range (1) loop
          declare

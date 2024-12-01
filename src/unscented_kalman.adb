@@ -1,6 +1,7 @@
 with Ada.Numerics.Generic_Real_Arrays;
 
 package body Unscented_Kalman is
+   pragma Assertion_Policy (Check);
 
    function Predict
      (Filter                      : in out Kalman_Filter_Type;
@@ -151,24 +152,22 @@ package body Unscented_Kalman is
 
       package Matrix_Ops is new Matrix_Operations (Matrix);
 
-      Start_Row_Index : Integer := First (Sigma_Points);
-      End_Row_Index   : Integer := Last (Sigma_Points);
-      Number_Rows     : Natural := Natural (Num_Points (Sigma_Points));
-      Middle_Index    : Integer :=
-        (Start_Row_Index + End_Row_Index) / Number_Rows;
+      Start_Sigma_Point_Index : Integer := First (Sigma_Points);
+      End_Sigma_Point_Index   : Integer := Last (Sigma_Points);
+      pragma Assert (-Start_Sigma_Point_Index = End_Sigma_Point_Index);
 
       Decomposed_Covariance : Points_Type;
    begin
       Decomposed_Covariance :=
         Matrix_To_Points
-          (Matrix_Type
+          (To_Matrix_Type
              (Matrix_Ops.Cholesky_Decomposition
-                (Matrix.Real_Matrix (Covariance (State_Estimate)))));
-      for Row_Index in Start_Row_Index .. End_Row_Index loop
+                (To_Real_Matrix (Covariance (State_Estimate)))));
+      for Row_Index in Start_Sigma_Point_Index .. End_Sigma_Point_Index loop
          declare
             Absolute_State_Bias : Displacement_Type :=
               Center_Weight *
-              Displacement_Type (Get (Decomposed_Covariance, Row_Index));
+              Displacement_Type (Get (Decomposed_Covariance, abs Row_Index));
          begin
             if Row_Index = 0 then
                Set (Sigma_Points, Row_Index, Mean (State_Estimate));
@@ -190,12 +189,15 @@ package body Unscented_Kalman is
       Initial_Covariance         : State_Covariance_Type;
       State_Transition           : Transition_Function;
       Measurement_Transformation : Measurement_Function;
-      Num_Sigma_Points : Positive; Weight_Parameters : Sigma_Weight_Parameters)
+      Weight_Parameters : Sigma_Weight_Parameters)
       return Kalman_Filter_Type
    is
       use Data_Points;
-      Sigma_Points_Index_Start : Integer := -Num_Sigma_Points / 2;
-      Sigma_Points_Index_End   : Integer := Num_Sigma_Points / 2;
+
+      pragma Assert (Initial_State'First = 1);
+
+      Sigma_Points_Index_Start : Integer := Initial_State'Length;
+      Sigma_Points_Index_End   : Integer := -Initial_State'Length;
 
       Filter : Kalman_Filter_Type :=
         (Current_Statistics         =>

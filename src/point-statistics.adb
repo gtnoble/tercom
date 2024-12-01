@@ -1,4 +1,5 @@
 package body Point.Statistics is
+   pragma Assertion_Policy (Check);
 
    function Predict_Statistics
      (Propagated_Points  : Points_Instance.Points_Type;
@@ -38,6 +39,13 @@ package body Point.Statistics is
    function Make_Statistics
      (Mean : Point_Type; Covariance : Covariance_Type) return Statistics_Type
    is
+      pragma Assert (Mean'First = 1);
+      pragma Assert (Covariance'First(1) = Mean'First);
+      pragma Assert (Covariance'First(2) = Mean'First);
+      pragma Assert (Covariance'Last(1) = Mean'Last);
+      pragma Assert (Covariance'Last(2) = Mean'Last);
+
+
       Created_Statistics : Statistics_Type;
    begin
       Created_Statistics.Mean       := To_Holder (Mean);

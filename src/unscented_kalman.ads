@@ -11,8 +11,9 @@ generic
 package Unscented_Kalman is
 
    subtype Sigma_Point_Index_Type is Integer;
+   subtype Point_Index_Type is Positive;
    package Matrix is new Ada.Numerics.Generic_Real_Arrays (Float_Type);
-   package Data_Point is new Point (Matrix);
+   package Data_Point is new Point (Matrix, Point_Index_Type);
    package Data_Points is new Data_Point.Points (Sigma_Point_Index_Type);
    package Data_Statistics is new Data_Point.Statistics (Data_Points);
 
@@ -50,7 +51,7 @@ package Unscented_Kalman is
       Initial_Covariance         : State_Covariance_Type;
       State_Transition           : Transition_Function;
       Measurement_Transformation : Measurement_Function;
-      Num_Sigma_Points : Positive; Weight_Parameters : Sigma_Weight_Parameters)
+      Weight_Parameters : Sigma_Weight_Parameters)
       return Kalman_Filter_Type;
 
    function Predict

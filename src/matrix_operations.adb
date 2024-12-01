@@ -48,7 +48,7 @@ package body Matrix_Operations is
       Matrix : Real_Matrix (Vector'Range, 0 .. 0);
    begin
       for Index in Vector'Range loop
-         Matrix (Index, 1) := Vector (Index);
+         Matrix (Index, 0) := Vector (Index);
       end loop;
       return Matrix;
    end To_Column_Vector;
@@ -58,7 +58,7 @@ package body Matrix_Operations is
       Matrix : Real_Matrix (0 .. 0, Vector'Range);
    begin
       for Index in Vector'Range loop
-         Matrix (1, Index) := Vector (Index);
+         Matrix (0, Index) := Vector (Index);
       end loop;
       return Matrix;
    end To_Row_Vector;

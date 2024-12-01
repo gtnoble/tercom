@@ -35,7 +35,7 @@ package body Unscented_Kalman_Test is
            Initial_Covariance         => Test_Initial_Covariance,
            State_Transition           => Transition_Function'Access,
            Measurement_Transformation => Measurement_Function'Access,
-           Num_Sigma_Points => 5, Weight_Parameters => Weight_Parameters);
+           Weight_Parameters => Weight_Parameters);
 
    end Test_Make_Kalman_Filter;
 

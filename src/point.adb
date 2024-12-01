@@ -1,20 +1,30 @@
+pragma Assertion_Policy (Check);
 package body Point is
 
    function Calculate_Cross_Covariance
      (X, Y : Displacement_Type) return Covariance_Type
    is
-      Row_Matrix    : Matrix_Type (X'Range, 0 .. 0);
-      Column_Matrix : Matrix_Type (0 .. 0, Y'Range);
+      First_Row_Index : constant Integer := Integer (X'First);
+      Last_Row_Index : constant Integer := Integer (X'Last);
+      First_Column_Index : constant Integer := Integer (Y'First);
+      Last_Column_Index : constant Integer := Integer (Y'Last);
+
+      Column_Vector    : Real_Matrix 
+         (First_Row_Index .. Last_Row_Index, 
+         First_Column_Index .. First_Column_Index);
+      Row_Vector : Real_Matrix 
+         (First_Row_Index .. First_Row_Index, 
+         First_Column_Index .. Last_Column_Index);
    begin
-      for Row in X'Range loop
-         Row_Matrix (Row, 0) := X (Row);
+      for Column in First_Column_Index .. Last_Column_Index loop
+         Row_Vector (Column, First_Row_Index) := X (Point_Index_Type (Column));
       end loop;
 
-      for Column in Y'Range loop
-         Column_Matrix (0, Column) := Y (Column);
+      for Row in First_Row_Index .. Last_Row_Index loop
+         Column_Vector (First_Column_Index, Row) := Y (Point_Index_Type (Row));
       end loop;
 
-      return Covariance_Type (Row_Matrix * Column_Matrix);
+      return Covariance_Type (To_Matrix_Type (Column_Vector * Row_Vector));
    end Calculate_Cross_Covariance;
 
    function Calculate_Autocovariance
@@ -24,7 +34,7 @@ package body Point is
       return Calculate_Cross_Covariance (X, X);
    end Calculate_Autocovariance;
 
-   function "=" (X, Y : Point_Type) return Boolean is
+   function "=" (X, Y : Vector_Type) return Boolean is
       Is_Equal : Boolean := True;
    begin
       for Index in X'Range loop
@@ -33,70 +43,108 @@ package body Point is
       return Is_Equal;
    end "=";
 
-   function "-" (X, Y : Point_Type) return Displacement_Type is
+   function "-" (X, Y : Vector_Type) return Displacement_Type is
    begin
-      return Displacement_Type (Vector_Type (X) - Vector_Type (Y));
+      return Vector_Type (X) - Vector_Type (Y);
    end "-";
 
-   function "-" (X, Y : Covariance_Type) return Covariance_Type is
+   function "-" (X, Y : Matrix_Type) return Matrix_Type is
    begin
-      return Covariance_Type (X - Y);
+      return To_Matrix_Type (To_Real_Matrix (X) - To_Real_Matrix (Y));
    end "-";
 
-   function "-" (X : Point_Type; Y : Displacement_Type) return Point_Type is
+   function "*" (X : Float_Type; Y : Matrix_Type) return Matrix_Type is
    begin
-      return Point_Type (X - Y);
-   end "-";
-
-   function "*" (X : Float_Type; Y : Covariance_Type) return Covariance_Type is
-   begin
-      return Covariance_Type (X * Real_Matrix (Y));
+      return To_Matrix_Type (X * To_Real_Matrix (Y));
    end "*";
 
-   function "+" (X, Y : Covariance_Type) return Covariance_Type is
+   function "+" (X, Y : Matrix_Type) return Matrix_Type is
    begin
-      return Covariance_Type (Real_Matrix (X) + Real_Matrix (Y));
+      return To_Matrix_Type (To_Real_Matrix (X) + To_Real_Matrix (Y));
    end "+";
 
-   function "+" (X : Point_Type; Y : Displacement_Type) return Point_Type is
+   function "+" (X, Y : Vector_Type) return Vector_Type is
    begin
-      return Point_Type (X + Y);
+      return To_Vector_Type (To_Real_Vector(X) + To_Real_Vector(Y));
    end "+";
 
-   function Inverse (X : Covariance_Type) return Inverse_Covariance_Type is
+   function Inverse (X : Matrix_Type) return Matrix_Type is
    begin
-      return Inverse_Covariance_Type (Inverse (Real_Matrix (X)));
+      return To_Matrix_Type (Inverse (To_Real_Matrix (X)));
    end Inverse;
 
    function "*"
-     (X : Covariance_Type; Y : Inverse_Covariance_Type) return Kalman_Gain_Type
+     (X,Y : Matrix_Type) return Matrix_Type
    is
    begin
-      return Kalman_Gain_Type (Real_Matrix (X) * Real_Matrix (Y));
+      return To_Matrix_Type (To_Real_Matrix (X) * To_Real_Matrix (Y));
    end "*";
 
    function "*"
-     (X : Kalman_Gain_Type; Y : Covariance_Type) return Covariance_Type
-   is
+     (X : Matrix_Type; Y : Vector_Type) return Vector_Type is
    begin
-      return Covariance_Type (Real_Matrix (X) * Real_Matrix (Y));
+      return To_Vector_Type (To_Real_Matrix (X) * To_Real_Vector (Y));
    end "*";
 
-   function "*"
-     (X : Kalman_Gain_Type; Y : Displacement_Type) return Displacement_Type is
+   function "*" (X : Float_Type; Y : Vector_Type) return Vector_Type is
    begin
-      return Displacement_Type (X * Y);
+      return To_Vector_Type (X * To_Real_Vector (Y));
    end "*";
 
-   function "*"
-     (X : Covariance_Type; Y : Kalman_Gain_Type) return Covariance_Type is
+   function "*" (X : Vector_Type; Y : Float_Type) return Vector_Type is
    begin
-      return Covariance_Type (X * Y);
+      return To_Vector_Type (Y * To_Real_Vector (X));
    end "*";
 
-   function Transpose (X : Kalman_Gain_Type) return Kalman_Gain_Type is
+   function Transpose (X : Matrix_Type) return Matrix_Type is
    begin
-      return Kalman_Gain_Type (Transpose (X));
+      return To_Matrix_Type (Transpose (To_Real_Matrix (X)));
    end Transpose;
+   
+   function To_Matrix_Type (X : Real_Matrix) return Matrix_Type is
+      
+      Returned_Matrix : Matrix_Type 
+         (Point_Index_Type (X'First (1)) .. Point_Index_Type (X'Last (1)),
+         Point_Index_Type (X'First (2)) .. Point_Index_Type (X'Last (2)));
+   begin
+      for Row_Index in Returned_Matrix'Range(1) loop
+         for Column_Index in Returned_Matrix'Range(2) loop
+            Returned_Matrix (Row_Index, Column_Index) := X (Integer (Row_Index), Integer (Column_Index));
+         end loop;
+      end loop;
+      return Returned_Matrix;
+   end To_Matrix_Type;
+   
+   function To_Vector_Type (X : Real_Vector) return Vector_Type is
+      Returned_Vector : Vector_Type (Point_Index_Type (X'First) .. Point_Index_Type (X'Last));
+   begin
+      for Index in Returned_Vector'Range loop
+         Returned_Vector (Index) := X (Integer (Index));
+      end loop;
+      return Returned_Vector;
+   end To_Vector_Type;
+   
+   function To_Real_Matrix (X : Matrix_Type) return Real_Matrix is
+      Returned_Real_Matrix : Real_Matrix 
+         (Integer (X'First (1)) .. Integer (X'Last (1)), 
+            Integer (X'First (2)) .. Integer (X'Last(2)));
+   begin
+      for Row_Index in Returned_Real_Matrix'Range(1) loop
+         for Column_Index in Returned_Real_Matrix'Range(2) loop
+            Returned_Real_Matrix (Row_Index, Column_Index) := X 
+               (Point_Index_Type (Row_Index), Point_Index_Type (Column_Index));
+         end loop;
+      end loop;
+      return Returned_Real_Matrix;
+   end To_Real_Matrix;
+   
+   function To_Real_Vector (X : Vector_Type) return Real_Vector is
+      Returned_Vector : Real_Vector (Integer (X'First) .. Integer (X'Last));
+   begin
+      for Index in Returned_Vector'Range loop
+         Returned_Vector (Index) := X (Point_Index_Type (Index));
+      end loop;
+      return Returned_Vector;
+   end To_Real_Vector;
 
 end Point;

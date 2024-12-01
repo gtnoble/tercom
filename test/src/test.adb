@@ -1,3 +1,5 @@
+pragma Assertion_Policy (Check);
+
 with AUnit.Reporter.Text;
 with Aunit.Run;
 with Unscented_Kalman_Suite; use Unscented_Kalman_suite;
