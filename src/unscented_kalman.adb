@@ -12,7 +12,7 @@ package body Unscented_Kalman is
       use Data_Statistics;
 
       Current_Sigma_Points    : State_Points_Type := Filter.Sigma_Points;
-      Propagated_Sigma_Points : State_Points_Type;
+      Propagated_Sigma_Points : State_Points_Type := Data_Points.Make_Points (First (Current_Sigma_Points), Last (Current_Sigma_Points));
 
       function Mean_Weight (Index : Sigma_Point_Index_Type) return Float_Type
       is
@@ -59,6 +59,7 @@ package body Unscented_Kalman is
       use Data_Points;
       use Data_Point;
       use Data_Statistics;
+      use Matrix;
 
       subtype Measurement_Statistics_Type is Data_Statistics.Statistics_Type;
 
@@ -105,13 +106,11 @@ package body Unscented_Kalman is
            Covariance_Weight'Access, Measurement_Noise_Covariance);
 
       declare
+         First_Sigma_Point : State_Point_Type := Get 
+            (Filter.Sigma_Points, First (Filter.Sigma_Points));
          State_Measurement_Cross_Covariance :
-           Cross_Covariance_Type
-             (Point_First (Filter.Sigma_Points) ..
-                  Point_Last (Filter.Sigma_Points),
-              Point_First (Propagated_Measurement_Points) ..
-                  Point_Last (Propagated_Measurement_Points)) :=
-           (others => (others => 0.0));
+           Cross_Covariance_Type (First_Sigma_Point'Range, First_Sigma_Point'Range) :=
+            (others => (others => 0.0));
       begin
          for Index in First (Filter.Sigma_Points) .. Last (Filter.Sigma_Points)
          loop
@@ -149,6 +148,7 @@ package body Unscented_Kalman is
       use Data_Point;
       use Data_Points;
       use Data_Statistics;
+      use Matrix;
 
       package Matrix_Ops is new Matrix_Operations (Matrix);
 
@@ -160,27 +160,30 @@ package body Unscented_Kalman is
    begin
       Decomposed_Covariance :=
         Matrix_To_Points
-          (To_Matrix_Type
              (Matrix_Ops.Cholesky_Decomposition
-                (To_Real_Matrix (Covariance (State_Estimate)))));
-      for Row_Index in Start_Sigma_Point_Index .. End_Sigma_Point_Index loop
-         declare
-            Absolute_State_Bias : Displacement_Type :=
-              Center_Weight *
-              Displacement_Type (Get (Decomposed_Covariance, abs Row_Index));
-         begin
-            if Row_Index = 0 then
-               Set (Sigma_Points, Row_Index, Mean (State_Estimate));
-            elsif Row_Index < 0 then
-               Set
-                 (Sigma_Points, Row_Index,
-                  Mean (State_Estimate) + Absolute_State_Bias);
-            else
-               Set
-                 (Sigma_Points, Row_Index,
-                  Mean (State_Estimate) - Absolute_State_Bias);
-            end if;
-         end;
+                (Covariance (State_Estimate)));
+      for Sigma_Point_Index in Start_Sigma_Point_Index .. End_Sigma_Point_Index loop
+         if Sigma_Point_Index = 0 then
+            Set (Sigma_Points, Sigma_Point_Index, Mean (State_Estimate));
+         else
+            declare
+               Absolute_State_Bias : Displacement_Type :=
+                 Center_Weight *
+                 Displacement_Type (Get 
+                  (Decomposed_Covariance, 
+                  (abs Sigma_Point_Index) - 1 + First (Decomposed_Covariance)));
+            begin
+               if Sigma_Point_Index < 0 then
+                  Set
+                    (Sigma_Points, Sigma_Point_Index,
+                     Mean (State_Estimate) + Absolute_State_Bias);
+               else
+                  Set
+                    (Sigma_Points, Sigma_Point_Index,
+                     Mean (State_Estimate) - Absolute_State_Bias);
+               end if;
+            end;
+         end if;
       end loop;
    end Update_Sigma_Points;
 
@@ -194,10 +197,8 @@ package body Unscented_Kalman is
    is
       use Data_Points;
 
-      pragma Assert (Initial_State'First = 1);
-
-      Sigma_Points_Index_Start : Integer := Initial_State'Length;
-      Sigma_Points_Index_End   : Integer := -Initial_State'Length;
+      Sigma_Points_Index_Start : Integer := -Initial_State'Length;
+      Sigma_Points_Index_End   : Integer := Initial_State'Length;
 
       Filter : Kalman_Filter_Type :=
         (Current_Statistics         =>
@@ -265,5 +266,15 @@ package body Unscented_Kalman is
       end if;
       return Weight;
    end Covariance_Weight_Function;
+   
+   function Mean (Statistics: State_Statistics_Type) return State_Point_Type is
+   begin
+      return Data_Statistics.Mean (Statistics => Statistics);
+   end Mean;
+   
+   function Covariance (Statistics : State_Statistics_Type) return State_Covariance_Type is
+   begin
+      return Data_Statistics.Covariance (Statistics => Statistics);
+   end Covariance;
 
 end Unscented_Kalman;

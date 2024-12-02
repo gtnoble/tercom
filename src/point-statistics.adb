@@ -11,11 +11,10 @@ package body Point.Statistics is
    is
       use Points_Instance;
 
+      First_Point : Point_Type := Points_Instance.Get 
+         (Propagated_Points, Points_Instance.First (Propagated_Points));
       Predicted_Mean       :
-        Point_Type
-          (Point_First (Propagated_Points) ..
-               Point_Last (Propagated_Points)) :=
-        (others => 0.0);
+        Point_Type (First_Point'Range) := (others => 0.0);
       Predicted_Covariance : Covariance_Type := Noise_Covariance;
    begin
       for Point_Index in First (Propagated_Points) .. Last (Propagated_Points)
@@ -39,12 +38,6 @@ package body Point.Statistics is
    function Make_Statistics
      (Mean : Point_Type; Covariance : Covariance_Type) return Statistics_Type
    is
-      pragma Assert (Mean'First = 1);
-      pragma Assert (Covariance'First(1) = Mean'First);
-      pragma Assert (Covariance'First(2) = Mean'First);
-      pragma Assert (Covariance'Last(1) = Mean'Last);
-      pragma Assert (Covariance'Last(2) = Mean'Last);
-
 
       Created_Statistics : Statistics_Type;
    begin

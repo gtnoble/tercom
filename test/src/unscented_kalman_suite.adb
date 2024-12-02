@@ -12,6 +12,8 @@ package body Unscented_Kalman_Suite is
    begin
       Ret.Add_Test
         (Caller.Create ("Test Make Kalman Filter", Test_Make_Kalman_Filter'Access));
+      Ret.Add_Test
+        (Caller.Create ("Test Predict", Test_Predict'Access));
       return Ret;
    end Suite;
 

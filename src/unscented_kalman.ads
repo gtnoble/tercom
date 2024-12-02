@@ -7,13 +7,14 @@ with Point.Points;
 with Point.Statistics;
 
 generic
-   type Float_Type is digits <>;
+   with package Matrix is new Ada.Numerics.Generic_Real_Arrays (<>);
 package Unscented_Kalman is
 
+   use Matrix;
+   subtype Float_Type is Matrix.Real;
    subtype Sigma_Point_Index_Type is Integer;
    subtype Point_Index_Type is Positive;
-   package Matrix is new Ada.Numerics.Generic_Real_Arrays (Float_Type);
-   package Data_Point is new Point (Matrix, Point_Index_Type);
+   package Data_Point is new Point (Matrix);
    package Data_Points is new Data_Point.Points (Sigma_Point_Index_Type);
    package Data_Statistics is new Data_Point.Statistics (Data_Points);
 
@@ -64,6 +65,9 @@ package Unscented_Kalman is
       Actual_Measurement           :        Measurement_Point_Type;
       Measurement_Noise_Covariance :        Measurement_Covariance_Type)
       return State_Statistics_Type;
+      
+   function Mean (Statistics : State_Statistics_Type) return State_Point_Type;
+   function Covariance (Statistics : State_Statistics_Type) return State_Covariance_Type;
 
 private
 
